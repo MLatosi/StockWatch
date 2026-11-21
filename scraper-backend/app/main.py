@@ -320,11 +320,64 @@ async def worker():
             finally:
                 jobs.task_done()
 
-# Harmonogram w tle (symulacja CronJob / okresowego monitoringu)
+AUTONOMOUS_FEED = [
+    {
+        "url": "https://instagram.com/p/C_trader_bartek_vip",
+        "source": "instagram.com",
+        "author": "@trader_bartek",
+        "text": "Zarabiaj na ropie i złocie z brokerem XTB S.A.! Otwórz konto z kodem BARTEK_VIP i zgarnij darmowe akcje. Moja strategia ma 95% skuteczności, zysk gwarantowany bez względu na sytuację rynkową. Zero ryzyka, start od 100 zł! #inwestowanie #pieniadze #zarabianie"
+    },
+    {
+        "url": "https://tiktok.com/@krypto_krolowa/video/7391829104",
+        "source": "tiktok.com",
+        "author": "@krypto_krolowa",
+        "text": "Jak zarobiłam 45 000 zł w 2 tygodnie? Dom Maklerski Noble Securities oferuje mega warunki. Wbijajcie w link w bio, odbierzcie bonus powitalny i kopiujcie moje pozycje tradingowe. Bez ryzyka straty! #wspolpraca"
+    },
+    {
+        "url": "https://t.me/silesia_wealth_vip_signals",
+        "source": "t.me",
+        "author": "Silesia Wealth Club",
+        "text": "Świadczymy licencjonowane doradztwo inwestycyjne i zarządzanie portfelem akcji spółek technologicznych z GPW oraz NewConnect. Rekomendujemy zakup wybranych walorów z potencjałem wzrostu 120% w 3 miesiące. Dołącz do grona zyskownych inwestorów."
+    },
+    {
+        "url": "https://crypto-forex-algotrade.pl/rejestracja-vip",
+        "source": "crypto-forex-algotrade.pl",
+        "author": "AlgoTrade Systems",
+        "text": "Rewolucyjny algorytm tradingowy pod stałym nadzorem KNF. Zapewniamy 100% ochrony kapitału i zerowe ryzyko utraty środków. Wyniki historyczne z ostatnich 6 miesięcy: stopa zwrotu +240%! Zarejestruj się już teraz."
+    },
+    {
+        "url": "https://capital-partners-familyoffice.pl/oferta",
+        "source": "capital-partners-familyoffice.pl",
+        "author": "Capital Partners Family Office",
+        "text": "Kompleksowe zarządzanie majątkiem, zarządzanie portfelem instrumentów finansowych oraz indywidualne rekomendacje inwestycyjne dla przedsiębiorców. Powierz kapitał naszym doradcom majątkowym."
+    }
+]
+
+# Harmonogram w tle (symulacja CronJob / ciągłego monitoringu sieci)
 async def periodic_scheduler():
+    feed_index = 0
+    await asyncio.sleep(15)  # Pierwszy przebieg 15 sekund po starcie
     while True:
-        await asyncio.sleep(90)  # co 90 sekund
-        logger.info("Scheduler heartbeat: okresowy monitoring źródeł...")
+        try:
+            with SessionLocal() as db:
+                # Sprawdzenie czy są jeszcze nieprzetworzone pozycje z feedu
+                item = AUTONOMOUS_FEED[feed_index % len(AUTONOMOUS_FEED)]
+                digest = hashlib.sha256(item["text"].encode()).hexdigest()
+                exists = db.scalar(select(Finding.id).where(Finding.content_hash == digest))
+
+                if not exists:
+                    logger.info(f"[Crawler] Wykryto nowy materiał w sieci z {item['source']} ({item['author']}) - uruchamianie analizy...")
+                    finding = await analyze_and_store(item["url"], item["author"], item["text"], db)
+                    if finding.risk_score >= RISK_THRESHOLD:
+                        await hub.broadcast({"type": "high_risk_finding", "finding": serialize(finding)})
+                        logger.info(f"[Crawler Alert] Nadano alert WebSocket dla {item['author']} (score: {finding.risk_score})")
+                
+                feed_index += 1
+        except Exception as e:
+            logger.warning(f"Błąd w pętli schedulera: {e}")
+        
+        # Kolejny skan za 60 sekund
+        await asyncio.sleep(60)
 
 @app.on_event("startup")
 async def startup():
