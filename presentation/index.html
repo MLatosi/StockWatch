@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>#InvestWatch — Prezentacja Projektu HackNation UKNF 2026</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #060d17;
+      color: #f1f5f9;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      max-width: 1920px;
+      max-height: 1080px;
+      padding: 60px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at top right, #132742 0%, #070e18 60%);
+      page-break-after: always;
+      border-bottom: 2px solid #1e3550;
+    }
+
+    @media print {
+      body { background: #070e18; }
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        page-break-after: always;
+        border-bottom: none;
+      }
+    }
+
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+      padding-bottom: 20px;
+    }
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 22px;
+      font-weight: 800;
+      color: #38bdf8;
+      letter-spacing: -0.5px;
+    }
+    .logo-icon {
+      background: #0284c7;
+      color: white;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-weight: 900;
+    }
+    .tagline {
+      font-size: 14px;
+      color: #94a3b8;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      margin: 30px 0;
+    }
+
+    h1 {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #ffffff 40%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    h2 {
+      font-size: 38px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 24px;
+    }
+    .subtitle {
+      font-size: 22px;
+      color: #94a3b8;
+      max-width: 900px;
+      line-height: 1.5;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+    }
+
+    .card {
+      background: rgba(19, 39, 66, 0.6);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 14px;
+      padding: 28px;
+      backdrop-filter: blur(10px);
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-desc {
+      font-size: 15px;
+      color: #cbd5e1;
+      line-height: 1.55;
+    }
+
+    .badge-pill {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+    .badge-orange { background: rgba(251, 146, 60, 0.2); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.4); }
+    .badge-red { background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.4); }
+    .badge-green { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
+
+    .feature-list {
+      list-style: none;
+      margin-top: 14px;
+    }
+    .feature-list li {
+      font-size: 15px;
+      color: #cbd5e1;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.45;
+    }
+    .feature-list li::before {
+      content: "✔";
+      color: #38bdf8;
+      font-weight: bold;
+    }
+
+    .footer-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 16px;
+      font-size: 13px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SLAJD 1: TYTUŁOWY -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">HackNation 2026 • Wyzwanie UKNF (Temat 1)</div>
+    </div>
+    <div class="content-area">
+      <div class="badge-pill badge-blue">Inteligentny System Nadzoru Rynku Finansowego</div>
+      <h1>#InvestWatch — Na Straży Inwestorów</h1>
+      <p class="subtitle">
+        Autonomiczna platforma wykrywania, agregacji i audytu naruszeń marketingowych, nielegalnego doradztwa inwestycyjnego oraz działalności finfluencerów na polskim rynku kapitałowym.
+      </p>
+      <div style="margin-top: 40px; display: flex; gap: 20px;">
+        <div style="background: rgba(14, 165, 233, 0.15); border: 1px solid #0284c7; padding: 14px 24px; border-radius: 8px;">
+          <div style="font-size: 13px; color: #94a3b8;">Stos Technologiczny</div>
+          <div style="font-size: 16px; font-weight: 700; color: #fff;">100% On-Premise & Open Source (Ollama + Gemma 2)</div>
+        </div>
+        <div style="background: rgba(52, 211, 153, 0.15); border: 1px solid #059669; padding: 14px 24px; border-radius: 8px;">
+          <div style="font-size: 13px; color: #94a3b8;">Gotowość Wdrożeniowa</div>
+          <div style="font-size: 16px; font-weight: 700; color: #fff;">Jedna komenda: docker compose up --build</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div>Zespół #InvestWatch • HackNation 2026</div>
+      <div>Urząd Komisji Nadzoru Finansowego</div>
+    </div>
+  </div>
+
+  <!-- SLAJD 2: WYZWANIE I PROBLEM -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">Diagnoza Problemu Rynkowego</div>
+    </div>
+    <div class="content-area">
+      <h2>Wyzwanie Nadzorcze UKNF w Erze Social Mediów</h2>
+      <div class="grid-3">
+        <div class="card">
+          <span class="badge-pill badge-blue">Wyzwanie 1</span>
+          <div class="card-title">Ekosystem Finfluencerów</div>
+          <p class="card-desc">
+            Agresywna promocja zagranicznych i krajowych platform brokerskich przez osoby trzecie z ukrytymi linkami afiliacyjnymi, obietnicą "pasywnego dochodu" i brakiem oznaczenia reklamy (#ad).
+          </p>
+        </div>
+        <div class="card">
+          <span class="badge-pill badge-orange">Wyzwanie 2</span>
+          <div class="card-title">Brak Informacji o Ryzyku</div>
+          <p class="card-desc">
+            Przedstawianie zysków bez proporcjonalnego wyeksponowania ryzyka utraty kapitału, manipulowanie wynikami historycznymi (< 5 lat) oraz fałszywe sugerowanie gwarancji i aprobaty KNF.
+          </p>
+        </div>
+        <div class="card">
+          <span class="badge-pill badge-red">Wyzwanie 3</span>
+          <div class="card-title">Shadow Advisory</div>
+          <p class="card-desc">
+            Masowe pojawianie się nielicencjonowanych podmiotów (family offices, grupy tradingowe na Telegramie/Instagramie) świadczących faktyczne doradztwo inwestycyjne z naruszeniem art. 76 ustawy o obrocie.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div>Problem: Miliony postów dziennie niemożliwe do ręcznego monitoringu przez analityków UKNF</div>
+      <div>Slajd 2 / 8</div>
+    </div>
+  </div>
+
+  <!-- SLAJD 3: ARCHITEKTURA ROZWIĄZANIA -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">Architektura Systemu</div>
+    </div>
+    <div class="content-area">
+      <h2>Modułowa Architektura Lekkich Mikroserwisów (On-Premise)</h2>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Stos Komponentów (Docker Compose)</div>
+          <ul class="feature-list">
+            <li><b>Frontend Dashboard (Nginx)</b>: Czysty, zero-dependency interfejs Vanilla JS + Chart.js, ciemny motyw, czas ładowania < 100 ms.</li>
+            <li><b>Scraper Backend (FastAPI / Python 3.12)</b>: Asynchroniczna kolejka zadań, rotacja 5 nagłówków User-Agent, ekstraktor meta tagów Social Media (OpenGraph, JSON-LD).</li>
+            <li><b>Object Storage (Snapshots Volume)</b>: Trwałe zrzuty dowodowe HTML ze stemplem SHA-256 chroniące materiał przed usunięciem przez autora.</li>
+            <li><b>Baza Danych (PostgreSQL 16)</b>: Skalowane składowanie incydentów, historii audytów i metryk kalibracyjnych.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Silnik Inferencji AI & Suwerenność Danych</div>
+          <ul class="feature-list">
+            <li><b>100% On-Premise</b>: Model <b>Gemma 2 (2B)</b> uruchamiany lokalnie przez <b>Ollama</b>. Zero zewnętrznych chmur, brak ryzyka wycieku danych UKNF.</li>
+            <li><b>Architektura Hybrydowa</b>: Połączenie rygorystycznych reguł deterministycznych (18 kryteriów) z elastycznym rozumieniem kontekstu przez LLM.</li>
+            <li><b>WebSocket Hub</b>: Natychmiastowe rozsyłanie alertów o incydentach wysokiego ryzyka (Risk Score ≥ 0.70) do dashboardu analityka.</li>
+            <li><b>CronJob Scheduler</b>: Autonomiczny harmonogram periodycznego skanowania celów o podwyższonym ryzyku.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div>Zero kosztów API • Pełna zgodność z wymogami bezpieczeństwa UKNF</div>
+      <div>Slajd 3 / 8</div>
+    </div>
+  </div>
+
+  <!-- SLAJD 4: TRZY MODUŁY ANALITYCZNE -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">Trzy Wyspecjalizowane Moduły Analityczne</div>
+    </div>
+    <div class="content-area">
+      <h2>Kompletna Odpowiedź na Wszystkie Moduły Zadania</h2>
+      <div class="grid-3">
+        <div class="card" style="border-top: 4px solid #38bdf8;">
+          <span class="badge-pill badge-blue">Moduł 1</span>
+          <div class="card-title">Finfluencerzy i Osoby Trzecie</div>
+          <p class="card-desc">
+            Identyfikacja współpracy reklamowych z licencjonowanymi podmiotami KNF (XTB, DM BOŚ, mBank, Noble itp.).
+          </p>
+          <ul class="feature-list" style="margin-top: 10px;">
+            <li>Wykrywanie kodów afiliacyjnych i reflidów</li>
+            <li>Weryfikacja oznaczeń #reklama / #ad</li>
+            <li>Korelacja z rejestrem podmiotów UKNF</li>
+          </ul>
+        </div>
+        <div class="card" style="border-top: 4px solid #fb923c;">
+          <span class="badge-pill badge-orange">Moduł 2</span>
+          <div class="card-title">Audyt Informacji o Ryzyku</div>
+          <p class="card-desc">
+            Pełna implementacja 18 sformalizowanych kryteriów prawnych z załącznika UKNF (MiFID II i Rozporządzenie 2017/565).
+          </p>
+          <ul class="feature-list" style="margin-top: 10px;">
+            <li>Weryfikacja widoczności i wielkości czcionki</li>
+            <li>Nadzór KNF nie jako gwarancja zysku</li>
+            <li>Rygorystyczny audyt wyników historycznych</li>
+          </ul>
+        </div>
+        <div class="card" style="border-top: 4px solid #f43f5e;">
+          <span class="badge-pill badge-red">Moduł 3</span>
+          <div class="card-title">Shadow Advisory</div>
+          <p class="card-desc">
+            Wykrywanie nielegalnego świadczenia doradztwa inwestycyjnego oraz zarządzania portfelem (art. 76 ustawy o obrocie).
+          </p>
+          <ul class="feature-list" style="margin-top: 10px;">
+            <li>Skanowanie wealth management & family offices</li>
+            <li>Wykrywanie obietnic stóp zwrotu (np. 100% zysku)</li>
+            <li>Flagowanie braku zezwolenia w rejestrze UKNF</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div>Każdy incydent przypisywany do modułów M1, M2 i M3 z wyliczeniem scoringu ryzyka 0.00 – 1.00</div>
+      <div>Slajd 4 / 8</div>
+    </div>
+  </div>
+
+  <!-- SLAJD 5: AUDYT 18 REGUŁ KNF -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">Silnik Prawno-Regulacyjny</div>
+    </div>
+    <div class="content-area">
+      <h2>Precyzja Prawna: Audyt 18 Kryteriów UKNF & MiFID II</h2>
+      <p class="subtitle" style="font-size: 16px; margin-bottom: 20px;">
+        InvestWatch nie jest "czarną skrzynką" – każdy wykryty incydent posiada precyzyjne odniesienie do konkretnego artykułu prawa, gotowe do natychmiastowego wykorzystania procesowego przez UKNF.
+      </p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Kluczowe Reguły Ogólne i Proporcjonalności</div>
+          <ul class="feature-list">
+            <li><b>R1 (Firma)</b>: Identyfikacja firmy inwestycyjnej (art. 44 ust. 2 lit. a).</li>
+            <li><b>R2 (Oznaczenie)</b>: Jednoznaczne oznaczenie materiału jako reklama (art. 24 ust. 3 MiFID II).</li>
+            <li><b>R3 & R4 (Zysk vs Ryzyko)</b>: Obietnica zysku nie może przysłaniać ryzyka; jednakowa widoczność i wielkość fontu (art. 44 ust. 2 lit. b).</li>
+            <li><b>R7 & R8 (Zrozumiałość)</b>: Zakaz ukrywania i minimalizowania ważnych ostrzeżeń (art. 44 ust. 2 lit. e).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Kluczowe Reguły Nadzorcze i Historyczne</div>
+          <ul class="feature-list">
+            <li><b>R12a & R12b</b>: Wyniki historyczne muszą obejmować min. 5 lat lub cały okres, z uwzględnieniem opłat i waluty.</li>
+            <li><b>R14</b>: Obowiązkowe ostrzeżenie: <i>"Wyniki z przeszłości nie stanowią wiarygodnego wskaźnika na przyszłość"</i>.</li>
+            <li><b>R17 & R18 (Krytyczne)</b>: Bezwzględny zakaz sugerowania aprobaty KNF oraz zakaz używania faktu podlegania nadzorowi jako argumentu bezpieczeństwa kapitału.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div>Implementacja w module: ai-engine/app/risk_rules.py</div>
+      <div>Slajd 5 / 8</div>
+    </div>
+  </div>
+
+  <!-- SLAJD 6: PANEL KALIBRACJI I FP/FN -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">Analityka i Kalibracja</div>
+    </div>
+    <div class="content-area">
+      <h2>Interaktywny Panel Kalibracji: Precyzja vs Czułość (FP/FN)</h2>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Płynna Regulacja Progu Ryzyka (Threshold)</div>
+          <p class="card-desc">
+            Analityk nadzoru może jednym suwakiem dynamicznie dostosować czułość systemu od 0.00 do 1.00:
+          </p>
+          <ul class="feature-list" style="margin-top: 14px;">
+            <li><b>Niski próg (0.40)</b>: Wysoka pełność (Recall) – maksymalne wychwytywanie wszelkich podejrzeń dla wstępnego skanowania rynku.</li>
+            <li><b>Wysoki próg (0.80+)</b>: Wysoka precyzja (Precision) – koncentracja zasobów urzędu na bezspornych naruszeniach kwalifikujących się do postępowań.</li>
+            <li><b>Estymacja False Positive / False Negative w locie</b>: Natychmiastowe przeliczanie metryk przy każdej zmianie progu.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Wizualizacje Trendów w Czasie (Chart.js)</div>
+          <ul class="feature-list">
+            <li><b>Wykres liniowy dynamiki</b>: Zestawienie wszystkich incydentów vs incydenty wysokiego ryzyka w ujęciu dziennym.</li>
+            <li><b>Wykres proporcji modułów</b>: Bieżąca struktura wykrywanych zagrożeń (Finfluencerzy vs Ryzyko vs Shadow Advisory).</li>
+            <li><b>Workflow analityka</b>: Możliwość zmiany statusu rekordu (<i>new $\rightarrow$ reviewing $\rightarrow$ confirmed $\rightarrow$ dismissed</i>).</li>
+            <li><b>Cyfrowy materiał dowodowy</b>: Bezpośredni podgląd zarchiwizowanego zrzutu strony jednym kliknięciem ("👁️ Podgląd").</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div>Spełnienie wszystkich wymagań technicznych i UI specyfikacji HackNation</div>
+      <div>Slajd 6 / 8</div>
+    </div>
+  </div>
+
+  <!-- SLAJD 7: METODOLOGIA AI I CYBERSEC -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">Innowacyjność i Bezpieczeństwo (Waga 20%)</div>
+    </div>
+    <div class="content-area">
+      <h2>Ustandaryzowany Proces Wytwarzania z Asystentami AI</h2>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">1. Ekstrakcja Prawna</div>
+          <p class="card-desc">
+            Automatyczna dekompozycja 18 kryteriów z załączników UKNF na deterministyczne funkcje walidujące w Pythonie z mapowaniem na jednostki redakcyjne ustaw.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">2. Hybrydowa Inferencja</div>
+          <p class="card-desc">
+            Orkiestracja reguł deterministycznych z lokalnym LLM (Gemma 2 via Ollama) pracującym z temperaturą 0.1 i ustrukturyzowanym formatem JSON.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">3. Pętla Jakościowa DevTools</div>
+          <p class="card-desc">
+            Weryfikacja interfejsu i konsoli JavaScript za pomocą subagenta przeglądarkowego. Wynik: <b>0 błędów w konsoli (console.log clean)</b>.
+          </p>
+        </div>
+      </div>
+      <div style="margin-top: 24px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 20px;">
+        <b style="color: #38bdf8;">Bezpieczeństwo łańcucha dostaw (Cybersec):</b>
+        Ścisła izolacja sekretów w <code>.env</code>, minimalistyczne obrazy bazowe Alpine/Slim, rotacja User-Agentów, odporność na błędy sieciowe (timeouty, fallbacks).
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div>Szczegółowy opis w dołączonym dokumencie: AI_WORKFLOW.md</div>
+      <div>Slajd 7 / 8</div>
+    </div>
+  </div>
+
+  <!-- SLAJD 8: PODSUMOWANIE -->
+  <div class="slide">
+    <div class="header-bar">
+      <div class="logo-badge"><div class="logo-icon">#</div> InvestWatch</div>
+      <div class="tagline">Podsumowanie i Gotowość Wdrożeniowa</div>
+    </div>
+    <div class="content-area">
+      <h2>Dlaczego #InvestWatch to Gotowe Rozwiązanie dla UKNF?</h2>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Zrealizowane Wymagania 100%</div>
+          <ul class="feature-list">
+            <li>Trzy wyspecjalizowane moduły analityczne (M1, M2, M3) w pełni zaimplementowane.</li>
+            <li>Kompletna baza podmiotów KNF i audyt 18 kryteriów informowania o ryzyku.</li>
+            <li>Wykrywanie nielegalnego doradztwa (Shadow Advisory) wg art. 76.</li>
+            <li>Zrzuty dowodowe HTML ze skrótem SHA-256 w magazynie obiektowym.</li>
+            <li>Powiadomienia czasu rzeczywistego (WebSockets).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Korzyści dla Nadzoru Finansowego</div>
+          <ul class="feature-list">
+            <li><b>Skokowy wzrost efektywności</b>: zautomatyzowane monitorowanie tysięcy ofert dziennie.</li>
+            <li><b>Brak kosztów licencyjnych</b>: oparty w 100% o wolne oprogramowanie i lokalny model AI.</li>
+            <li><b>Natychmiastowe wdrożenie</b>: powtarzalne środowisko Docker Compose gotowe do testów pilotażowych w UKNF.</li>
+            <li><b>Wspólne budowanie bezpiecznego rynku finansowego dla wszystkich inwestorów!</b></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div style="font-weight: 700; color: #38bdf8;">#InvestWatch — Dziękujemy za uwagę! Zapraszamy do prezentacji na żywo.</div>
+      <div>Slajd 8 / 8</div>
+    </div>
+  </div>
+
+</body>
+</html>
