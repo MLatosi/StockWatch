@@ -376,10 +376,51 @@ def findings(min_risk: float = 0, source: str | None = None, module: int | None 
 @app.get("/findings/{finding_id}/snapshot")
 def get_snapshot(finding_id: int, db: Session = Depends(get_db)):
     row = db.get(Finding, finding_id)
-    if not row or not row.snapshot_path or not Path(row.snapshot_path).exists():
-        raise HTTPException(404, "Snapshot not found")
-    content = Path(row.snapshot_path).read_text(encoding="utf-8")
-    return HTMLResponse(content=content)
+    if not row:
+        raise HTTPException(404, "Finding not found")
+    
+    # Jeśli plik istnieje na dysku, zwróć go
+    if row.snapshot_path and Path(row.snapshot_path).exists():
+        content = Path(row.snapshot_path).read_text(encoding="utf-8")
+        return HTMLResponse(content=content)
+    
+    # Fallback / samonaprawienie: wygeneruj snapshot z zarchiwizowanego rekordu w bazie
+    digest = row.content_hash or hashlib.sha256((row.text or "").encode()).hexdigest()
+    snapshot_file = SNAPSHOTS_DIR / f"{digest}.html"
+    
+    html_content = f"""<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Zrzut archiwalny #{row.id} — #InvestWatch</title>
+  <style>
+    body {{ font-family: system-ui, -apple-system, sans-serif; background: #0b1523; color: #e2e8f0; margin: 0; padding: 24px; }}
+    .header {{ background: #132238; border: 1px solid #1e3550; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }}
+    .badge {{ display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: bold; font-size: 13px; background: rgba(255,82,99,0.2); color: #ff5263; border: 1px solid rgba(255,82,99,0.4); }}
+    .content {{ background: #101c2e; border: 1px solid #1e3550; border-radius: 8px; padding: 20px; white-space: pre-wrap; font-size: 15px; line-height: 1.6; }}
+    .meta {{ color: #8fa5be; font-size: 13px; margin-top: 6px; }}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0; color:#38bdf8;">#InvestWatch — Zrzut Archiwalny Incydentu #{row.id}</h2>
+      <span class="badge">Risk Score: {row.risk_score:.2f}</span>
+    </div>
+    <div class="meta"><b>Źródło:</b> <a href="{row.url}" target="_blank" style="color:#38bdf8;">{row.url}</a> | <b>Autor:</b> {row.author or 'Nieznany'} | <b>Data rejestracji:</b> {row.created_at.isoformat()}</div>
+  </div>
+  <h3>Zarejestrowana treść materiału / posta:</h3>
+  <div class="content">{row.text}</div>
+</body>
+</html>"""
+    try:
+        snapshot_file.write_text(html_content, encoding="utf-8")
+        row.snapshot_path = str(snapshot_file)
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Could not persist fallback snapshot: {e}")
+    
+    return HTMLResponse(content=html_content)
 
 @app.get("/analytics/summary")
 def summary(threshold: float = 0.70, db: Session = Depends(get_db)):
