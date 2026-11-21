@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>#InvestWatch — Dashboard Analityczny UKNF</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="chart.umd.js"></script>
+</head>
+<body>
+  <header>
+    <div class="logo-group">
+      <span class="mark">#</span>
+      <div>
+        <h1>InvestWatch — Dashboard Analityczny</h1>
+        <p>System automatycznej identyfikacji naruszeń i monitoringu ofert finansowych • UKNF HackNation 2026</p>
+      </div>
+    </div>
+    <div class="status-badge" id="connStatus">● System Online</div>
+  </header>
+
+  <main>
+    <!-- Sekcja Wykresów Trendów i Modułów -->
+    <section class="card">
+      <h2>📊 Trendy Incydentów i Rozkład Modułów Nadzorczych</h2>
+      <div class="charts-grid">
+        <div>
+          <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Dynamika wykrytych incydentów w czasie (Wszystkie vs Wysokie Ryzyko)</div>
+          <div class="chart-wrapper">
+            <canvas id="trendsChart"></canvas>
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Rozkład wg modułów (M1: Finfluencerzy, M2: Ryzyko, M3: Shadow Advisory)</div>
+          <div class="chart-wrapper">
+            <canvas id="modulesChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sekcja Kalibracji i Statystyk -->
+    <section class="card">
+      <h2>⚙️ Panel Kalibracji Progu Detekcji (Threshold)</h2>
+      <div class="controls-row">
+        <div class="control-group" style="flex: 2;">
+          <label>Próg odcięcia ryzyka (risk_score): <b id="thresholdDisplay" style="color: var(--accent);">0.70</b></label>
+          <input id="threshold" type="range" min="0" max="1" step="0.05" value="0.70">
+        </div>
+        <div class="control-group">
+          <label>Filtr źródła</label>
+          <input id="sourceFilter" placeholder="np. instagram, aura, bossa">
+        </div>
+        <div class="control-group">
+          <label>Moduł analityczny</label>
+          <select id="moduleFilter">
+            <option value="">Wszystkie moduły (M1, M2, M3)</option>
+            <option value="1">Moduł 1 — Finfluencerzy i podmioty trzecie</option>
+            <option value="2">Moduł 2 — Zgodność i informacja o ryzyku</option>
+            <option value="3">Moduł 3 — Shadow Advisory (brak licencji KNF)</option>
+          </select>
+        </div>
+        <button id="refreshBtn" style="height: 38px; align-self: flex-end;">Odśwież</button>
+      </div>
+
+      <div class="stats-grid" style="margin-top: 18px;">
+        <div class="stat-item"><b id="statTotal">0</b><span>Incydentów ponad progiem</span></div>
+        <div class="stat-item danger"><b id="statHigh">0</b><span>Wysokie ryzyko (≥ 0.70)</span></div>
+        <div class="stat-item warn"><b id="statReview">0</b><span>Oczekujące na audyt (new)</span></div>
+        <div class="stat-item"><b id="statFp">0</b><span>Szacowane False Positive</span></div>
+        <div class="stat-item"><b id="statFn">0</b><span>Szacowane False Negative</span></div>
+      </div>
+    </section>
+
+    <!-- Sekcja Nowego Skanowania i Szybkich Próbek Demo -->
+    <section class="card">
+      <h2>🔍 Nowe Skanowanie i Scenariusze Demonstracyjne</h2>
+      <div class="tab-nav">
+        <button class="tab-btn active" id="tabUrlBtn">Skanowanie URL</button>
+        <button class="tab-btn" id="tabTextBtn">Bezpośrednia Analiza Tekstu / Próbki Demo</button>
+      </div>
+
+      <!-- Skanowanie URL -->
+      <div id="tabUrlContent">
+        <form id="urlScanForm" style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <input id="scanUrl" type="url" placeholder="https://adres-strony-lub-profilu.pl" required style="flex: 2; min-width: 280px;">
+          <input id="scanAuthor" placeholder="Autor / Profil (np. @finfluencer)" style="flex: 1; min-width: 180px;">
+          <button type="submit">Dodaj do kolejki crawlingu</button>
+        </form>
+      </div>
+
+      <!-- Bezpośrednia analiza tekstu i próbki demo -->
+      <div id="tabTextContent" style="display: none;">
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Wklej treść oferty lub wybierz gotowy scenariusz demo przygotowany dla Jury:</div>
+        <textarea id="directText" rows="4" style="width: 100%;" placeholder="Wklej treść posta, oferty lub materiału promocyjnego..."></textarea>
+        <div style="display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; align-items: center;">
+          <input id="directAuthor" placeholder="Autor / Konto (opcjonalnie)" style="flex: 1;">
+          <button id="directScanBtn">Analizuj treść natychmiast</button>
+        </div>
+        <div class="sample-buttons">
+          <button type="button" class="sample-btn" id="sampleM1">✨ Próbka M1: Finfluencer Instagram z kodem XTB</button>
+          <button type="button" class="sample-btn" id="sampleM2">✨ Próbka M2: Ostrzeżenie i gwarancja KNF (Global Trade)</button>
+          <button type="button" class="sample-btn" id="sampleM3">✨ Próbka M3: Shadow Family Office (Aura Wealth)</button>
+          <button type="button" class="sample-btn" id="sampleOk">✨ Próbka Zgodna: Komunikat DM BOŚ z ryzykiem</button>
+        </div>
+      </div>
+
+      <div id="scanStatusBox" style="margin-top: 12px; font-size: 14px; color: var(--accent); font-weight: 600;"></div>
+    </section>
+
+    <!-- Tabela Wyników Incydentów -->
+    <section class="card">
+      <h2>📋 Rejestr Wykrytych Incydentów</h2>
+      <div id="liveAlertBox" class="alert-box"></div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 100px;">Ryzyko</th>
+            <th style="width: 110px;">Moduły</th>
+            <th style="width: 180px;">Źródło i Autor</th>
+            <th>Uzasadnienie i Audyt 18 Reguł KNF</th>
+            <th style="width: 110px;">Zrzut</th>
+            <th style="width: 130px;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="findingsRows">
+          <tr><td colspan="6" style="text-align: center; color: var(--muted);">Ładowanie danych...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

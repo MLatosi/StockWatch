@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-investwatch}
+      POSTGRES_USER: ${POSTGRES_USER:-investwatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ai-engine:
+    build: ./ai-engine
+    environment:
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma2:2b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports: ["8001:8001"]
+
+  scraper-backend:
+    build: ./scraper-backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://investwatch:change-me@db:5432/investwatch}
+      AI_ENGINE_URL: ${AI_ENGINE_URL:-http://ai-engine:8001}
+      RISK_THRESHOLD: ${RISK_THRESHOLD:-0.70}
+    volumes:
+      - snapshots_data:/app/snapshots
+    depends_on:
+      db:
+        condition: service_healthy
+      ai-engine:
+        condition: service_started
+    ports: ["8000:8000"]
+
+  frontend-dashboard:
+    build: ./frontend-dashboard
+    depends_on: [scraper-backend]
+    ports: ["8080:80"]
+
+volumes:
+  postgres_data:
+  snapshots_data:
