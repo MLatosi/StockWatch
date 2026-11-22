@@ -223,6 +223,26 @@ $('#sourceFilter').addEventListener('input', loadData);
 $('#moduleFilter').addEventListener('change', loadData);
 $('#refreshBtn').addEventListener('click', loadData);
 
+$('#discoverBtn').addEventListener('click', async () => {
+  const button = $('#discoverBtn');
+  const status = $('#scanStatusBox');
+  button.disabled = true;
+  status.textContent = 'Szukam publicznych stron pasujących do monitorowanych haseł…';
+  try {
+    const response = await fetch('/api/discover', { method: 'POST' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'Wyszukiwanie nie powiodło się');
+    status.textContent = result.queued
+      ? `Znaleziono ${result.queued} nowych stron i dodano je do kolejki skanowania.`
+      : 'Wyszukiwanie zakończone. Nie znaleziono nowych stron do skanowania.';
+    if (result.queued) setTimeout(loadData, 1500);
+  } catch (err) {
+    status.textContent = 'Błąd wyszukiwania: ' + err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
 // Obsługa zakładek skanowania
 $('#tabUrlBtn').addEventListener('click', () => {
   $('#tabUrlBtn').classList.add('active');

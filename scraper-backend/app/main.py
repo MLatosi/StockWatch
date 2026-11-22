@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+import xml.etree.ElementTree as ET
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -17,6 +18,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy import DateTime, Float, Integer, JSON, String, Text, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from app.watchlist import WATCHLIST as SEARCH_TERMS
 
 logger = logging.getLogger("investwatch.backend")
 
@@ -353,31 +355,44 @@ AUTONOMOUS_FEED = [
     }
 ]
 
-# Harmonogram w tle (symulacja CronJob / ciągłego monitoringu sieci)
+async def discover_public_pages(db: Session, limit: int = 30):
+    """Search Google News RSS for public web pages matching the configured watch terms."""
+    query = " OR ".join(f'"{item["term"]}"' for item in SEARCH_TERMS[:20])
+    params = {"q": query, "hl": "pl", "gl": "PL", "ceid": "PL:pl"}
+    headers = {"User-Agent": "InvestWatch/0.5 (public RSS discovery)"}
+    async with httpx.AsyncClient(timeout=25, follow_redirects=True, headers=headers) as client:
+        response = await client.get("https://news.google.com/rss/search", params=params)
+        response.raise_for_status()
+    root = ET.fromstring(response.content)
+    found = []
+    for item in root.findall(".//item")[:limit]:
+        url = (item.findtext("link") or "").strip()
+        title = (item.findtext("title") or "").strip()
+        if not url.startswith("https://"):
+            continue
+        if db.scalar(select(Finding.id).where(Finding.url == url)):
+            continue
+        if db.scalar(select(ScanJob.id).where(ScanJob.url == url, ScanJob.status.in_(["queued", "processing", "completed"]))):
+            continue
+        job = ScanJob(url=url, author="Google News RSS: " + title[:200])
+        db.add(job)
+        db.flush()
+        await jobs.put(job.id)
+        found.append({"url": url, "title": title, "job_id": job.id})
+    db.commit()
+    return found
+
 async def periodic_scheduler():
-    feed_index = 0
-    await asyncio.sleep(15)  # Pierwszy przebieg 15 sekund po starcie
+    await asyncio.sleep(20)
     while True:
         try:
             with SessionLocal() as db:
-                # Sprawdzenie czy są jeszcze nieprzetworzone pozycje z feedu
-                item = AUTONOMOUS_FEED[feed_index % len(AUTONOMOUS_FEED)]
-                digest = hashlib.sha256(item["text"].encode()).hexdigest()
-                exists = db.scalar(select(Finding.id).where(Finding.content_hash == digest))
-
-                if not exists:
-                    logger.info(f"[Crawler] Wykryto nowy materiał w sieci z {item['source']} ({item['author']}) - uruchamianie analizy...")
-                    finding = await analyze_and_store(item["url"], item["author"], item["text"], db)
-                    if finding.risk_score >= RISK_THRESHOLD:
-                        await hub.broadcast({"type": "high_risk_finding", "finding": serialize(finding)})
-                        logger.info(f"[Crawler Alert] Nadano alert WebSocket dla {item['author']} (score: {finding.risk_score})")
-                
-                feed_index += 1
-        except Exception as e:
-            logger.warning(f"Błąd w pętli schedulera: {e}")
-        
-        # Kolejny skan za 60 sekund
-        await asyncio.sleep(60)
+                found = await discover_public_pages(db)
+                if found:
+                    logger.info("RSS discovery queued %s public pages", len(found))
+        except Exception as exc:
+            logger.warning("Public RSS discovery failed: %s", exc)
+        await asyncio.sleep(int(os.getenv("DISCOVERY_INTERVAL_SECONDS", "60")))
 
 @app.on_event("startup")
 async def startup():
@@ -410,9 +425,22 @@ async def health():
         "queue_size": jobs.qsize(),
         "risk_threshold": RISK_THRESHOLD,
         "scheduler": "active",
+        "discovery_interval_seconds": int(os.getenv("DISCOVERY_INTERVAL_SECONDS", "60")),
         "object_storage": "snapshots_volume_ready",
         "ai_engine_link": ai_status
     }
+
+@app.get("/watchlist")
+def watchlist():
+    return {"terms": SEARCH_TERMS, "count": len(SEARCH_TERMS), "source": "Google News RSS"}
+
+@app.post("/discover")
+async def discover_now(db: Session = Depends(get_db)):
+    try:
+        found = await discover_public_pages(db)
+        return {"source": "Google News RSS", "queued": len(found), "items": found}
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"Public search source unavailable: {exc}")
 
 @app.get("/findings")
 def findings(min_risk: float = 0, source: str | None = None, module: int | None = None, db: Session = Depends(get_db)):
