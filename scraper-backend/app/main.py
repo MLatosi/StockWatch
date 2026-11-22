@@ -367,30 +367,43 @@ AUTONOMOUS_FEED = [
 
 async def discover_public_pages(db: Session, limit: int = 30):
     """Search Google News RSS for public web pages matching the configured watch terms."""
-    query = " OR ".join(f'"{item["term"]}"' for item in SEARCH_TERMS[:20])
-    params = {"q": query, "hl": "pl", "gl": "PL", "ceid": "PL:pl"}
     headers = {"User-Agent": "InvestWatch/0.5 (public RSS discovery)"}
+    found, seen, feed_items, relevant_items = [], set(), 0, 0
+    finance_context = ("giełd", "akcj", "obligac", "maklersk", "broker", "trading", "inwestor", "kapitał", "etf", "forex", "cfd", "kryptowalut", "fundusz", "doradztw inwestycyjn", "portfel inwestycyjn", "instrument finansow", "zysk", "stopa zwrotu")
+    groups = [SEARCH_TERMS[i:i + 4] for i in range(0, len(SEARCH_TERMS), 4)]
     async with httpx.AsyncClient(timeout=25, follow_redirects=True, headers=headers) as client:
-        response = await client.get("https://news.google.com/rss/search", params=params)
-        response.raise_for_status()
-    root = ET.fromstring(response.content)
-    found = []
-    for item in root.findall(".//item")[:limit]:
-        url = (item.findtext("link") or "").strip()
-        title = (item.findtext("title") or "").strip()
-        if not url.startswith("https://"):
-            continue
-        if db.scalar(select(Finding.id).where(Finding.url == url)):
-            continue
-        if db.scalar(select(ScanJob.id).where(ScanJob.url == url, ScanJob.status.in_(["queued", "processing", "completed"]))):
-            continue
-        job = ScanJob(url=url, author="Google News RSS: " + title[:200])
-        db.add(job)
-        db.flush()
-        await jobs.put(job.id)
-        found.append({"url": url, "title": title, "job_id": job.id})
+        for group in groups:
+            query = " OR ".join(item["term"] for item in group)
+            params = {"q": query, "hl": "pl", "gl": "PL", "ceid": "PL:pl"}
+            response = await client.get("https://news.google.com/rss/search", params=params)
+            response.raise_for_status()
+            root = ET.fromstring(response.content)
+            items = root.findall(".//item")
+            feed_items += len(items)
+            for item in items:
+                if len(found) >= limit:
+                    break
+                url = (item.findtext("link") or "").strip()
+                title = (item.findtext("title") or "").strip()
+                summary = BeautifulSoup(item.findtext("description") or "", "html.parser").get_text(" ", strip=True)
+                searchable = (title + " " + summary).lower()
+                if not any(signal in searchable for signal in finance_context):
+                    continue
+                relevant_items += 1
+                if not url.startswith("https://") or url in seen:
+                    continue
+                seen.add(url)
+                if db.scalar(select(Finding.id).where(Finding.url == url)):
+                    continue
+                if db.scalar(select(ScanJob.id).where(ScanJob.url == url, ScanJob.status.in_(["queued", "processing", "completed"]))):
+                    continue
+                job = ScanJob(url=url, author="Google News RSS: " + title[:200])
+                db.add(job)
+                db.flush()
+                await jobs.put(job.id)
+                found.append({"url": url, "title": title, "job_id": job.id})
     db.commit()
-    return found
+    return {"items": found, "feed_items": feed_items, "relevant_items": relevant_items, "query_count": len(groups)}
 
 async def periodic_scheduler():
     await asyncio.sleep(20)
@@ -398,10 +411,12 @@ async def periodic_scheduler():
         discovery_status.update({"stage": "searching", "last_started_at": datetime.now(timezone.utc).isoformat(), "last_error": None})
         try:
             with SessionLocal() as db:
-                found = await discover_public_pages(db)
-                discovery_status["last_found"] = len(found)
-                if found:
-                    logger.info("RSS discovery queued %s public pages", len(found))
+                result = await discover_public_pages(db)
+                discovery_status["last_found"] = len(result["items"])
+                discovery_status["feed_items"] = result["feed_items"]
+                discovery_status["relevant_items"] = result["relevant_items"]
+                if result["feed_items"]:
+                    logger.info("RSS returned %s entries; queued %s new pages", result["feed_items"], len(result["items"]))
         except Exception as exc:
             discovery_status["last_error"] = str(exc)[:300]
             logger.warning("Public RSS discovery failed: %s", exc)
@@ -467,9 +482,9 @@ def crawler_status(db: Session = Depends(get_db)):
 async def discover_now(db: Session = Depends(get_db)):
     discovery_status.update({"stage": "searching", "last_started_at": datetime.now(timezone.utc).isoformat(), "last_error": None})
     try:
-        found = await discover_public_pages(db)
-        discovery_status.update({"last_found": len(found), "last_finished_at": datetime.now(timezone.utc).isoformat()})
-        return {"source": "Google News RSS", "queued": len(found), "items": found}
+        result = await discover_public_pages(db)
+        discovery_status.update({"last_found": len(result["items"]), "feed_items": result["feed_items"], "relevant_items": result["relevant_items"], "last_finished_at": datetime.now(timezone.utc).isoformat()})
+        return {"source": "Google News RSS", "queued": len(result["items"]), "feed_items": result["feed_items"], "relevant_items": result["relevant_items"], "query_count": result["query_count"], "items": result["items"]}
     except httpx.HTTPError as exc:
         discovery_status["last_error"] = str(exc)[:300]
         raise HTTPException(502, f"Public search source unavailable: {exc}")

@@ -227,7 +227,7 @@ async function updateCrawlerStatus() {
         $('#currentPage').textContent = 'Ostatnie wyszukiwanie nie powiodło się: ' + status.discovery.last_error;
       } else {
         const lastRun = status.discovery.last_finished_at ? new Date(status.discovery.last_finished_at).toLocaleTimeString('pl-PL') : 'jeszcze się nie odbyło';
-        $('#currentPage').textContent = 'Ostatnie wyszukiwanie: ' + lastRun + ' · nowych adresów: ' + status.discovery.last_found + '. Użyj „Szukaj publicznych stron teraz”, aby uruchomić ręcznie.';
+        $('#currentPage').textContent = 'Ostatnie wyszukiwanie: ' + lastRun + ' · wpisy RSS: ' + (status.discovery.feed_items ?? '—') + ' · pasujące finansowo: ' + (status.discovery.relevant_items ?? '—') + ' · nowe adresy w kolejce: ' + status.discovery.last_found + '. Użyj „Szukaj publicznych stron teraz”, aby uruchomić ręcznie.';
       }
     }
   } catch (err) {
@@ -265,9 +265,7 @@ $('#discoverBtn').addEventListener('click', async () => {
     const response = await fetch('/api/discover', { method: 'POST' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || 'Wyszukiwanie nie powiodło się');
-    status.textContent = result.queued
-      ? `Znaleziono ${result.queued} nowych stron i dodano je do kolejki skanowania.`
-      : 'Wyszukiwanie zakończone. Nie znaleziono nowych stron do skanowania.';
+    status.textContent = `Google News RSS zwrócił ${result.feed_items} wpisów; ${result.relevant_items} pasuje do tematyki finansowej, ${result.queued} nowych adresów dodano do kolejki.`;
     if (result.queued) setTimeout(loadData, 1500);
   } catch (err) {
     status.textContent = 'Błąd wyszukiwania: ' + err.message;
