@@ -3,6 +3,14 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 let trendsChart = null;
 let modulesChart = null;
+let filterTimer = null;
+
+async function getJson(url, options) {
+  const response = await fetch(url, options);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.detail || `Błąd serwera (${response.status})`);
+  return body;
+}
 
 // Szybkie próbki demonstracyjne
 const SAMPLES = {
@@ -131,8 +139,8 @@ async function loadData() {
 
   try {
     const [findings, summary] = await Promise.all([
-      fetch('/api/findings?' + params).then(r => r.json()),
-      fetch('/api/analytics/summary?threshold=' + thresholdVal).then(r => r.json())
+      getJson('/api/findings?' + params),
+      getJson('/api/analytics/summary?threshold=' + thresholdVal)
     ]);
 
     // Uaktualnienie wskaźników statystycznych
@@ -206,22 +214,27 @@ async function loadData() {
     }).join('');
 
     updateCharts();
+    $('#scanStatusBox').textContent = '';
   } catch (err) {
     console.error('Error loading data:', err);
+    $('#findingsRows').innerHTML = `<div class="empty-state error-state"><b>Nie udało się pobrać wyników</b><span>${esc(err.message)}. Sprawdź połączenie z backendem i spróbuj ponownie.</span></div>`;
+    $('#scanStatusBox').textContent = 'Nie udało się odświeżyć dashboardu: ' + err.message;
   }
 }
 
 async function updateCrawlerStatus() {
   try {
-    const status = await fetch('/api/crawler/status').then(r => r.json());
+    const status = await getJson('/api/crawler/status');
     $('#pagesAnalyzed').textContent = status.completed_scans;
     $('#findingsSaved').textContent = status.analyzed_pages;
+    $('#findingsSavedDetail').textContent = status.analyzed_pages;
     $('#pagesQueued').textContent = status.queued_scans;
     $('#pagesFailed').textContent = status.failed_scans;
+    $('#pagesFailedDetail').textContent = status.failed_scans;
     const failures = status.recent_failures || [];
     $('#crawlerFailures').innerHTML = failures.length
       ? '<b>Ostatnie błędy skanowania</b>' + failures.map(f => `<div class="crawler-failure"><a href="${esc(f.url)}" target="_blank" rel="noreferrer">${esc(f.url)}</a><span>${esc(f.error || 'Brak opisu błędu')}</span></div>`).join('')
-      : '';
+      : '<span class="no-failures">Brak ostatnich błędów. Skaner działa poprawnie.</span>';
     if (status.is_working) {
       const stage = status.current.stage === 'fetching_page' ? 'Pobieram stronę' : 'Analizuję treść';
       $('#crawlerState').textContent = '● ' + stage + '…';
@@ -242,34 +255,46 @@ async function updateCrawlerStatus() {
         $('#currentPage').textContent = 'Ostatnie wyszukiwanie nie powiodło się: ' + status.discovery.last_error;
       } else {
         const lastRun = status.discovery.last_finished_at ? new Date(status.discovery.last_finished_at).toLocaleTimeString('pl-PL') : 'jeszcze się nie odbyło';
-        $('#currentPage').textContent = 'Ostatnie wyszukiwanie: ' + lastRun + ' · wpisy RSS: ' + (status.discovery.feed_items ?? '—') + ' · pasujące finansowo: ' + (status.discovery.relevant_items ?? '—') + ' · nowe adresy w kolejce: ' + status.discovery.last_found + '. Użyj „Szukaj publicznych stron teraz”, aby uruchomić ręcznie.';
+        $('#currentPage').textContent = 'Ostatnie wyszukiwanie: ' + lastRun + ' · wpisy RSS: ' + (status.discovery.feed_items ?? '—') + ' · pasujące finansowo: ' + (status.discovery.relevant_items ?? '—') + ' · nowe adresy w kolejce: ' + status.discovery.last_found + '. Wyszukiwanie uruchamia się automatycznie.';
       }
     }
   } catch (err) {
-    $('#crawlerState').textContent = '● Nie można pobrać statusu skanera';
+    $('#crawlerState').textContent = 'Nie można pobrać statusu skanera';
+    $('#currentPage').textContent = 'Sprawdź połączenie z backendem.';
   }
 }
 
 // Zmiana statusu incydentu
 $('#findingsRows').addEventListener('change', async e => {
   if (e.target.dataset.id) {
-    await fetch(`/api/findings/${e.target.dataset.id}/status`, {
+    const select = e.target;
+    select.disabled = true;
+    try {
+    await getJson(`/api/findings/${select.dataset.id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: e.target.value })
+      body: JSON.stringify({ status: select.value })
     });
     loadData();
+    } catch (err) {
+      $('#scanStatusBox').textContent = 'Nie udało się zapisać statusu: ' + err.message;
+      select.disabled = false;
+    }
   }
 });
 
 // Zmiana progu detekcji i filtrów
 $('#threshold').addEventListener('input', () => {
   $('#thresholdDisplay').textContent = parseFloat($('#threshold').value).toFixed(2);
-  loadData();
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(loadData, 180);
 });
-$('#sourceFilter').addEventListener('input', loadData);
+$('#sourceFilter').addEventListener('input', () => {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(loadData, 250);
+});
 $('#moduleFilter').addEventListener('change', loadData);
-$('#refreshBtn').addEventListener('click', loadData);
+$('#refreshBtn').addEventListener('click', () => { loadData(); updateCrawlerStatus(); });
 
 $('#discoverBtn').addEventListener('click', async () => {
   const button = $('#discoverBtn');
@@ -277,11 +302,10 @@ $('#discoverBtn').addEventListener('click', async () => {
   button.disabled = true;
   status.textContent = 'Szukam publicznych stron pasujących do monitorowanych haseł…';
   try {
-    const response = await fetch('/api/discover', { method: 'POST' });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.detail || 'Wyszukiwanie nie powiodło się');
+    const result = await getJson('/api/discover', { method: 'POST' });
     status.textContent = `Google News RSS zwrócił ${result.feed_items} wpisów; ${result.relevant_items} pasuje do tematyki finansowej, ${result.queued} nowych adresów dodano do kolejki.`;
-    if (result.queued) setTimeout(loadData, 1500);
+    updateCrawlerStatus();
+    if (result.queued) setTimeout(() => { loadData(); updateCrawlerStatus(); }, 1500);
   } catch (err) {
     status.textContent = 'Błąd wyszukiwania: ' + err.message;
   } finally {
@@ -311,7 +335,7 @@ $('#urlScanForm').addEventListener('submit', async e => {
   statusBox.textContent = 'Dodano zadanie do kolejki pobierania i analizy...';
 
   try {
-    const res = await fetch('/api/scans', {
+    const job = await getJson('/api/scans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -319,17 +343,19 @@ $('#urlScanForm').addEventListener('submit', async e => {
         author: $('#scanAuthor').value || null
       })
     });
-    const job = await res.json();
-    if (!res.ok) throw new Error(job.detail || 'Błąd żądania');
-
     statusBox.textContent = `Zadanie skanowania #${job.id} w toku. Oczekiwanie na wynik...`;
 
     const poll = setInterval(async () => {
-      const jobCheck = await fetch('/api/jobs/' + job.id).then(r => r.json());
+      let jobCheck;
+      try { jobCheck = await getJson('/api/jobs/' + job.id); } catch (err) {
+        clearInterval(poll);
+        statusBox.textContent = 'Nie udało się sprawdzić zadania: ' + err.message;
+        return;
+      }
       if (jobCheck.status === 'completed') {
         clearInterval(poll);
         statusBox.textContent = '✅ Skanowanie i analiza AI zakończone sukcesem.';
-        loadData();
+        loadData(); updateCrawlerStatus();
       } else if (jobCheck.status === 'failed') {
         clearInterval(poll);
         statusBox.textContent = '❌ Błąd podczas skanowania: ' + jobCheck.error;
@@ -351,17 +377,14 @@ $('#directScanBtn').addEventListener('click', async () => {
     return;
   }
 
-  statusBox.textContent = 'Analiza tekstu przez silnik AI (audyt 18 reguł)...';
+  statusBox.textContent = 'Analizuję tekst i sprawdzam sygnały ryzyka...';
 
   try {
-    const res = await fetch('/api/scans/direct', {
+    const result = await getJson('/api/scans/direct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, author })
     });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.detail || 'Błąd analizy');
-
     statusBox.textContent = `✅ Analiza ukończona. Wykryte moduły: [${result.modules.map(m=>'M'+m).join(', ')}], Wskaźnik ryzyka: ${result.risk_score.toFixed(2)}`;
     loadData();
   } catch (err) {
@@ -375,7 +398,7 @@ function setSample(sampleKey) {
   if (!sample) return;
   $('#directAuthor').value = sample.author;
   $('#directText').value = sample.text;
-  $('#scanStatusBox').textContent = `Załadowano gotową próbkę. Kliknij 'Analizuj treść natychmiast' lub edytuj tekst.`;
+  $('#scanStatusBox').textContent = 'Próbka jest gotowa. Możesz ją zmienić albo kliknąć „Analizuj tekst”.';
 }
 
 $('#sampleM1').addEventListener('click', () => setSample('m1'));
@@ -389,7 +412,7 @@ function connectWebSocket() {
   const ws = new WebSocket(`${protocol}://${location.host}/ws/alerts`);
 
   ws.onopen = () => {
-    $('#connStatus').textContent = '● System Online';
+    $('#connStatus').textContent = 'System online';
     $('#connStatus').classList.remove('offline');
   };
 
@@ -410,7 +433,7 @@ function connectWebSocket() {
   };
 
   ws.onclose = () => {
-    $('#connStatus').textContent = '● Rozłączono (reconnecting...)';
+    $('#connStatus').textContent = 'Ponawiam połączenie…';
     $('#connStatus').classList.add('offline');
     setTimeout(connectWebSocket, 3000);
   };
@@ -421,6 +444,7 @@ window.addEventListener('DOMContentLoaded', () => {
   initCharts();
   loadData();
   updateCrawlerStatus();
-  setInterval(updateCrawlerStatus, 2000);
+  setInterval(updateCrawlerStatus, 4000);
+  setInterval(loadData, 15000);
   connectWebSocket();
 });

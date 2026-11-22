@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b1220">
   <title>InvestWatch — Wyniki monitoringu</title>
-  <link rel="stylesheet" href="style.css?v=20261122-3">
+  <link rel="stylesheet" href="style.css?v=20261122-4">
   <script src="chart.umd.js"></script>
 </head>
 <body>
@@ -15,7 +15,7 @@
       <span><b>InvestWatch</b><small>Monitoring rynku finansowego</small></span>
     </a>
     <div class="topbar-actions">
-      <span class="status-badge" id="connStatus"><i></i> Łączenie…</span>
+      <span class="status-badge" id="connStatus"><i></i> Łączenie z systemem…</span>
       <button class="btn-secondary" id="discoverBtn" type="button">Szukaj nowych stron</button>
     </div>
   </header>
@@ -31,6 +31,11 @@
         <div class="result-total"><b id="statTotal">0</b><span>wyników<br>ponad progiem</span></div>
       </div>
 
+      <section class="scanner-overview" aria-label="Status skanera">
+        <div class="scanner-indicator"><span class="pulse-dot"></span><div><b id="crawlerState">Łączenie ze skanerem…</b><small id="currentPage">Pobieram aktualny status pracy.</small></div></div>
+        <div class="scanner-counts"><span><b id="pagesAnalyzed">0</b><small>przeanalizowane</small></span><span><b id="pagesQueued">0</b><small>w kolejce</small></span><span><b id="pagesFailed">0</b><small>błędów</small></span></div>
+      </section>
+
       <div class="filterbar">
         <label class="search-field"><span aria-hidden="true">⌕</span><input id="sourceFilter" placeholder="Szukaj źródła lub domeny…" autocomplete="off"></label>
         <label class="select-field"><span>Moduł</span><select id="moduleFilter">
@@ -43,13 +48,12 @@
       </div>
       <div class="quick-stats">
         <span><i class="dot dot-red"></i><b id="statHigh">0</b> wysokie ryzyko</span>
-        <span><i class="dot dot-amber"></i><b id="statReview">0</b> do weryfikacji</span>
-        <span id="scanSummary"><i class="dot dot-green"></i><b id="pagesAnalyzed">0</b> skanów zakończonych</span>
-        <span class="scan-queue">Kolejka <b id="pagesQueued">0</b></span>
+        <span><i class="dot dot-amber"></i><b id="statReview">0</b> czeka na weryfikację</span>
+        <span><i class="dot dot-green"></i><b id="findingsSaved">0</b> zapisanych materiałów</span>
       </div>
 
       <div id="liveAlertBox" class="alert-box"></div>
-      <div id="scanStatusBox" class="inline-message" aria-live="polite"></div>
+      <div id="scanStatusBox" class="inline-message" role="status" aria-live="polite"></div>
       <div id="findingsRows" class="result-list" aria-live="polite">
         <div class="empty-state">Ładowanie wyników…</div>
       </div>
@@ -63,8 +67,8 @@
           <input id="threshold" type="range" min="0" max="1" step="0.05" value="0.70">
           <p class="muted-note">Wyniki poniżej progu są ukryte.</p>
           <div class="stats-grid">
-            <div class="stat-item"><b id="findingsSaved">0</b><span>Unikalne zapisane treści</span></div>
-            <div class="stat-item"><b id="pagesFailed">0</b><span>Błędy pobierania</span></div>
+            <div class="stat-item"><b id="findingsSavedDetail">0</b><span>Unikalne zapisane treści</span></div>
+            <div class="stat-item"><b id="pagesFailedDetail">0</b><span>Błędy pobierania</span></div>
             <div class="stat-item"><b id="statFp">—</b><span>Odrzucone wyniki ponad progiem</span></div>
             <div class="stat-item"><b id="statFn">—</b><span>Potwierdzone wyniki poniżej progu</span></div>
             <div class="stat-item"><b id="statPrecision">—</b><span>Precyzja w ocenionych wynikach</span></div>
@@ -75,8 +79,8 @@
       </details>
 
       <details class="tool-panel">
-        <summary><span>Skaner i kolejka</span><small id="crawlerState">Sprawdzam status…</small></summary>
-        <div class="tool-content"><div id="currentPage" class="current-page"></div><div id="crawlerFailures" class="crawler-failures"></div></div>
+        <summary><span>Ostatnie błędy skanowania</span><small>Adresy, których nie udało się pobrać</small></summary>
+        <div class="tool-content"><div id="crawlerFailures" class="crawler-failures"></div></div>
       </details>
 
       <details class="tool-panel">
@@ -95,6 +99,6 @@
       <footer>InvestWatch <span>•</span> Prototyp wspierający analizę, nie zastępuje oceny eksperta.</footer>
     </aside>
   </main>
-  <script src="app.js?v=20261122-3"></script>
+  <script src="app.js?v=20261122-4"></script>
 </body>
 </html>
