@@ -205,14 +205,16 @@ async function loadData() {
 async function updateCrawlerStatus() {
   try {
     const status = await fetch('/api/crawler/status').then(r => r.json());
-    $('#pagesAnalyzed').textContent = status.analyzed_pages;
+    $('#pagesAnalyzed').textContent = status.completed_scans;
+    $('#findingsSaved').textContent = status.analyzed_pages;
     $('#pagesQueued').textContent = status.queued_scans;
     $('#pagesFailed').textContent = status.failed_scans;
     if (status.is_working) {
       const stage = status.current.stage === 'fetching_page' ? 'Pobieram stronę' : 'Analizuję treść';
       $('#crawlerState').textContent = '● ' + stage + '…';
       $('#crawlerState').style.color = 'var(--accent)';
-      $('#currentPage').innerHTML = 'Teraz: <a target="_blank" rel="noreferrer" href="' + esc(status.current.url) + '">' + esc(status.current.url) + '</a>';
+      const elapsed = status.current.started_at ? Math.max(0, Math.floor(Date.now() / 1000 - new Date(status.current.started_at).getTime() / 1000)) : 0;
+      $('#currentPage').innerHTML = 'Teraz (' + elapsed + ' s): <a target="_blank" rel="noreferrer" href="' + esc(status.current.url) + '">' + esc(status.current.url) + '</a>';
     } else if (status.discovery.stage === 'searching') {
       $('#crawlerState').textContent = '● Szukam nowych publicznych stron…';
       $('#crawlerState').style.color = 'var(--accent)';
