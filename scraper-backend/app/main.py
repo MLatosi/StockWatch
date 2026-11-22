@@ -436,6 +436,11 @@ async def startup():
             conn.execute(text("ALTER TABLE findings ADD COLUMN snapshot_path VARCHAR(512)"))
     with SessionLocal() as db:
         seed_demo(db)
+        pending_jobs = db.scalars(select(ScanJob.id).where(ScanJob.status == "queued").order_by(ScanJob.created_at)).all()
+        for job_id in pending_jobs:
+            await jobs.put(job_id)
+        if pending_jobs:
+            logger.info("Recovered %s pending scan jobs from database", len(pending_jobs))
     asyncio.create_task(worker())
     asyncio.create_task(periodic_scheduler())
 
