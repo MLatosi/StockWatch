@@ -256,6 +256,74 @@ footer span { padding: 0 5px; color: var(--accent); }
   .filterbar { flex-wrap: wrap; }
 }
 
+/* Pełnoekranowy pulpit: wykorzystuje szerokość i wysokość okna bez pustych boków. */
+@media (min-width: 901px) and (min-height: 650px) {
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  .topbar { height: 58px; padding-inline: 22px; }
+  .dashboard {
+    width: 100%; height: calc(100dvh - 58px); max-width: none; margin: 0;
+    padding: 12px 18px 9px; overflow: hidden;
+    display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(310px, .85fr);
+    grid-template-rows: auto auto minmax(170px, 25dvh) minmax(0, 1fr) auto;
+    grid-template-areas: "heading heading" "scanner scanner" "charts charts" "results tools" "footer footer";
+    gap: 9px 14px;
+  }
+  .dashboard > .page-heading { grid-area: heading; min-height: 48px; margin: 0; }
+  .dashboard > .scanner-overview { grid-area: scanner; min-height: 52px; margin: 0; padding: 9px 14px; }
+  .dashboard > .chart-dashboard { grid-area: charts; min-height: 0; height: 100%; margin: 0; gap: 10px; }
+  .dashboard > .chart-dashboard > .dashboard-panel { min-height: 0; padding: 11px 14px 8px; }
+  .chart-dashboard .panel-heading { margin-bottom: 3px; }
+  .chart-dashboard .panel-heading h2 { font-size: 13px; }
+  .chart-dashboard .panel-heading p { font-size: 10px; }
+  .chart-dashboard .chart-wrapper { height: calc(100% - 40px); min-height: 115px; }
+  .dashboard > .results-section { grid-area: results; min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+  .results-heading { flex: 0 0 auto; margin-bottom: 7px; }
+  .results-heading h2 { font-size: 19px; }
+  .stats-strip { flex: 0 0 auto; grid-template-columns: repeat(3,minmax(90px,1fr)) minmax(170px,1.4fr); gap: 6px; margin-bottom: 6px; }
+  .summary-stat, .threshold-control { min-height: 47px; padding: 5px 9px; }
+  .summary-stat b { font-size: 14px; }
+  .summary-stat span, .threshold-control > span { font-size: 9px; }
+  .filterbar { flex: 0 0 auto; margin-bottom: 6px; }
+  .filterbar .search-field, .filterbar .select-field { height: 34px; }
+  .dashboard > .results-section > .inline-message:not(:empty), .dashboard > .results-section > .alert-box:not(:empty) { flex: 0 0 auto; margin-bottom: 6px; padding: 6px 9px; font-size: 10px; }
+  .dashboard > .results-section > .result-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; align-content: start; padding-right: 3px; }
+  .result-card { grid-template-columns: 62px minmax(0,1fr) 120px; gap: 10px; padding: 11px 12px; }
+  .result-card:hover { transform: none; }
+  .risk-score { min-width: 54px; height: 34px; font-size: 15px; }
+  .result-reason { font-size: 11px; }
+  .module-list { margin: 5px 0; }
+  .dashboard > .lower-dashboard { grid-area: tools; min-width: 0; min-height: 0; height: 100%; margin: 0; display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto minmax(0,1fr); gap: 7px; overflow: hidden; }
+  .lower-dashboard > .dashboard-panel { min-height: 0; padding: 10px 12px; overflow: auto; }
+  .lower-dashboard .panel-heading { margin-bottom: 6px; }
+  .lower-dashboard .panel-heading h2 { font-size: 12px; }
+  .lower-dashboard .panel-heading p { font-size: 9px; }
+  .lower-dashboard .review-panel .stats-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; }
+  .lower-dashboard .review-panel .stat-item { padding: 6px; }
+  .lower-dashboard .review-panel .stat-item b { font-size: 13px; }
+  .lower-dashboard .review-panel .stat-item span { font-size: 8px; }
+  .lower-dashboard .review-panel .muted-note { margin: 5px 0 0; font-size: 9px; }
+  .lower-dashboard .manual-panel .scan-form { gap: 5px; padding-top: 5px; }
+  .lower-dashboard .manual-panel input, .lower-dashboard .manual-panel button { padding: 7px 8px; font-size: 10px; }
+  .lower-dashboard .manual-panel .tab-nav { padding: 0; }
+  .lower-dashboard .manual-panel .tab-btn { padding: 5px 8px; }
+  .lower-dashboard .manual-panel textarea { margin-top: 6px; }
+  .lower-dashboard .manual-panel .sample-buttons { margin-top: 5px; }
+  .lower-dashboard .crawler-failures { grid-template-columns: 1fr; gap: 4px; padding-top: 0; font-size: 9px; }
+  .lower-dashboard .crawler-failure { padding: 5px 7px; }
+  .dashboard > footer { grid-area: footer; padding: 0 2px; font-size: 9px; }
+}
+@media (min-width: 901px) and (max-height: 760px) {
+  .dashboard { grid-template-rows: auto auto minmax(145px, 22dvh) minmax(0,1fr) auto; gap: 6px 10px; padding: 8px 12px 5px; }
+  .dashboard > .scanner-overview { min-height: 44px; padding-block: 6px; }
+  .scanner-counts { gap: 14px; }
+  .chart-dashboard .chart-wrapper { min-height: 95px; }
+  .result-card { padding-block: 8px; }
+}
+@media (max-width: 900px), (max-height: 649px) {
+  html, body { height: auto; min-height: 100%; overflow: auto; }
+  .dashboard { width: 100%; max-width: none; padding-inline: clamp(12px, 2vw, 22px); }
+}
+
 /* Czytelniejszy pulpit: najpierw stan systemu, potem lista wykrytych materiałów. */
 :root {
   --bg: #080f1b;
