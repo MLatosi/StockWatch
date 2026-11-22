@@ -202,6 +202,27 @@ async function loadData() {
   }
 }
 
+async function updateCrawlerStatus() {
+  try {
+    const status = await fetch('/api/crawler/status').then(r => r.json());
+    $('#pagesAnalyzed').textContent = status.analyzed_pages;
+    $('#pagesQueued').textContent = status.queued_scans;
+    $('#pagesFailed').textContent = status.failed_scans;
+    if (status.is_working) {
+      const stage = status.current.stage === 'fetching_page' ? 'Pobieram stronę' : 'Analizuję treść';
+      $('#crawlerState').textContent = '● ' + stage + '…';
+      $('#crawlerState').style.color = 'var(--accent)';
+      $('#currentPage').innerHTML = 'Teraz: <a target="_blank" rel="noreferrer" href="' + esc(status.current.url) + '">' + esc(status.current.url) + '</a>';
+    } else {
+      $('#crawlerState').textContent = '● Skaner uruchomiony — oczekuje na nowe strony';
+      $('#crawlerState').style.color = 'var(--muted)';
+      $('#currentPage').textContent = 'Automatyczne wyszukiwanie sprawdza publiczne wyniki co minutę.';
+    }
+  } catch (err) {
+    $('#crawlerState').textContent = '● Nie można pobrać statusu skanera';
+  }
+}
+
 // Zmiana statusu incydentu
 $('#findingsRows').addEventListener('change', async e => {
   if (e.target.dataset.id) {
@@ -374,5 +395,7 @@ function connectWebSocket() {
 window.addEventListener('DOMContentLoaded', () => {
   initCharts();
   loadData();
+  updateCrawlerStatus();
+  setInterval(updateCrawlerStatus, 2000);
   connectWebSocket();
 });

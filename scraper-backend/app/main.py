@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, HttpUrl
-from sqlalchemy import DateTime, Float, Integer, JSON, String, Text, create_engine, inspect, select, text
+from sqlalchemy import DateTime, Float, Integer, JSON, String, Text, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from app.watchlist import WATCHLIST as SEARCH_TERMS
 
@@ -92,6 +92,7 @@ class Hub:
                     self.clients.remove(ws)
 
 hub, jobs = Hub(), asyncio.Queue()
+active_scan = {"job_id": None, "url": None, "author": None, "stage": "idle", "started_at": None}
 app = FastAPI(title="#InvestWatch Ingestion API", version="0.4.0")
 
 # Lista celów do okresowego monitoringu (CronJob / Watchlist)
@@ -262,6 +263,8 @@ async def analyze_and_store(url: str, author: str | None, raw_text: str | None, 
         text_content = raw_text.strip()[:30000]
         html_content = f"<html><body><p>{text_content}</p></body></html>"
     else:
+        if active_scan["job_id"] is not None:
+            active_scan["stage"] = "fetching_page"
         headers = {"User-Agent": random.choice(USER_AGENTS)}
         async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers) as client:
             resp = await client.get(url)
@@ -270,6 +273,8 @@ async def analyze_and_store(url: str, author: str | None, raw_text: str | None, 
             text_content = extract_smart_content(html_content)
 
     # Wysłanie do AI Engine z timeoutem do 30 sekund
+    if active_scan["job_id"] is not None:
+        active_scan["stage"] = "analyzing_content"
     async with httpx.AsyncClient(timeout=30.0) as client:
         ai_resp = await client.post(f"{AI_URL}/analyze", json={"text": text_content, "url": url, "author": author})
         ai_resp.raise_for_status()
@@ -307,9 +312,11 @@ async def worker():
         with SessionLocal() as db:
             job = db.get(ScanJob, job_id)
             if not job:
+                jobs.task_done()
                 continue
             job.status = "processing"
             db.commit()
+            active_scan.update({"job_id": job.id, "url": job.url, "author": job.author, "stage": "fetching_page", "started_at": datetime.now(timezone.utc).isoformat()})
             try:
                 finding = await analyze_and_store(job.url, job.author, None, db)
                 job.status, job.finding_id = "completed", finding.id
@@ -320,6 +327,7 @@ async def worker():
                 job.status, job.error = "failed", str(exc)[:500]
                 db.commit()
             finally:
+                active_scan.update({"job_id": None, "url": None, "author": None, "stage": "idle", "started_at": None})
                 jobs.task_done()
 
 AUTONOMOUS_FEED = [
@@ -433,6 +441,18 @@ async def health():
 @app.get("/watchlist")
 def watchlist():
     return {"terms": SEARCH_TERMS, "count": len(SEARCH_TERMS), "source": "Google News RSS"}
+
+@app.get("/crawler/status")
+def crawler_status(db: Session = Depends(get_db)):
+    return {
+        "analyzed_pages": db.scalar(select(func.count(Finding.id))) or 0,
+        "completed_scans": db.scalar(select(func.count(ScanJob.id)).where(ScanJob.status == "completed")) or 0,
+        "failed_scans": db.scalar(select(func.count(ScanJob.id)).where(ScanJob.status == "failed")) or 0,
+        "queued_scans": db.scalar(select(func.count(ScanJob.id)).where(ScanJob.status == "queued")) or 0,
+        "is_working": active_scan["job_id"] is not None,
+        "current": active_scan.copy(),
+        "discovery_interval_seconds": int(os.getenv("DISCOVERY_INTERVAL_SECONDS", "60")),
+    }
 
 @app.post("/discover")
 async def discover_now(db: Session = Depends(get_db)):
