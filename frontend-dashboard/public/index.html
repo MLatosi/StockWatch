@@ -4,101 +4,62 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b1220">
-  <title>InvestWatch — Wyniki monitoringu</title>
-  <link rel="stylesheet" href="style.css?v=20261122-4">
+  <title>InvestWatch — Panel monitoringu</title>
+  <link rel="stylesheet" href="style.css?v=20261122-5">
   <script src="chart.umd.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#wyniki" aria-label="InvestWatch, przejdź do wyników">
-      <span class="brand-mark">IW</span>
-      <span><b>InvestWatch</b><small>Monitoring rynku finansowego</small></span>
-    </a>
-    <div class="topbar-actions">
-      <span class="status-badge" id="connStatus"><i></i> Łączenie z systemem…</span>
-      <button class="btn-secondary" id="discoverBtn" type="button">Szukaj nowych stron</button>
-    </div>
+    <a class="brand" href="#wyniki" aria-label="InvestWatch — strona główna"><span class="brand-mark">IW</span><span><b>InvestWatch</b><small>Monitoring rynku finansowego</small></span></a>
+    <div class="topbar-actions"><span class="status-badge" id="connStatus"><i></i> Łączenie z systemem…</span><button class="btn-secondary" id="discoverBtn" type="button">Szukaj nowych stron</button></div>
   </header>
 
-  <main>
-    <section class="results-section" id="wyniki">
-      <div class="page-heading">
-        <div>
-          <div class="eyebrow">CENTRUM ANALIZY</div>
-          <h1>Wyniki monitoringu</h1>
-          <p>Przeglądaj wykryte materiały, sprawdzaj uzasadnienia i kieruj sprawy do audytu.</p>
-        </div>
-        <div class="result-total"><b id="statTotal">0</b><span>wyników<br>ponad progiem</span></div>
-      </div>
-
-      <section class="scanner-overview" aria-label="Status skanera">
-        <div class="scanner-indicator"><span class="pulse-dot"></span><div><b id="crawlerState">Łączenie ze skanerem…</b><small id="currentPage">Pobieram aktualny status pracy.</small></div></div>
-        <div class="scanner-counts"><span><b id="pagesAnalyzed">0</b><small>przeanalizowane</small></span><span><b id="pagesQueued">0</b><small>w kolejce</small></span><span><b id="pagesFailed">0</b><small>błędów</small></span></div>
-      </section>
-
-      <div class="filterbar">
-        <label class="search-field"><span aria-hidden="true">⌕</span><input id="sourceFilter" placeholder="Szukaj źródła lub domeny…" autocomplete="off"></label>
-        <label class="select-field"><span>Moduł</span><select id="moduleFilter">
-          <option value="">Wszystkie moduły</option>
-          <option value="1">M1 · Finfluencerzy</option>
-          <option value="2">M2 · Informacja o ryzyku</option>
-          <option value="3">M3 · Shadow Advisory</option>
-        </select></label>
-        <button class="icon-button" id="refreshBtn" type="button" title="Odśwież wyniki" aria-label="Odśwież wyniki">↻</button>
-      </div>
-      <div class="quick-stats">
-        <span><i class="dot dot-red"></i><b id="statHigh">0</b> wysokie ryzyko</span>
-        <span><i class="dot dot-amber"></i><b id="statReview">0</b> czeka na weryfikację</span>
-        <span><i class="dot dot-green"></i><b id="findingsSaved">0</b> zapisanych materiałów</span>
-      </div>
-
-      <div id="liveAlertBox" class="alert-box"></div>
-      <div id="scanStatusBox" class="inline-message" role="status" aria-live="polite"></div>
-      <div id="findingsRows" class="result-list" aria-live="polite">
-        <div class="empty-state">Ładowanie wyników…</div>
-      </div>
+  <main class="dashboard">
+    <section class="page-heading">
+      <div><div class="eyebrow">CENTRUM MONITORINGU</div><h1>Dashboard</h1><p>W jednym miejscu sprawdzisz pracę skanera, trendy i materiały wymagające uwagi.</p></div>
+      <button class="icon-button refresh-large" id="refreshBtn" type="button" title="Odśwież dashboard" aria-label="Odśwież dashboard">↻</button>
     </section>
 
-    <aside class="secondary-tools">
-      <details class="tool-panel">
-        <summary><span>Ustawienia widoku</span><small>Próg ryzyka oraz licznik zapisanych wyników</small></summary>
-        <div class="tool-content">
-          <label class="threshold-label">Minimalny poziom ryzyka <b id="thresholdDisplay">0.70</b></label>
-          <input id="threshold" type="range" min="0" max="1" step="0.05" value="0.70">
-          <p class="muted-note">Wyniki poniżej progu są ukryte.</p>
-          <div class="stats-grid">
-            <div class="stat-item"><b id="findingsSavedDetail">0</b><span>Unikalne zapisane treści</span></div>
-            <div class="stat-item"><b id="pagesFailedDetail">0</b><span>Błędy pobierania</span></div>
-            <div class="stat-item"><b id="statFp">—</b><span>Odrzucone wyniki ponad progiem</span></div>
-            <div class="stat-item"><b id="statFn">—</b><span>Potwierdzone wyniki poniżej progu</span></div>
-            <div class="stat-item"><b id="statPrecision">—</b><span>Precyzja w ocenionych wynikach</span></div>
-            <div class="stat-item"><b id="statRecall">—</b><span>Czułość w ocenionych wynikach</span></div>
-          </div>
-          <p class="muted-note" id="reviewedSampleCount">Metryki pojawią się po oznaczeniu wyników jako potwierdzone lub odrzucone.</p>
-        </div>
-      </details>
+    <section class="scanner-overview" aria-label="Bieżąca praca skanera">
+      <div class="scanner-indicator"><span class="pulse-dot"></span><div><b id="crawlerState">Łączenie ze skanerem…</b><small id="currentPage">Pobieram aktualny status pracy.</small></div></div>
+      <div class="scanner-counts"><span><b id="pagesAnalyzed">0</b><small>zadań zakończonych</small></span><span><b id="pagesQueued">0</b><small>w kolejce</small></span><span><b id="pagesFailed">0</b><small>błędów</small></span></div>
+    </section>
 
-      <details class="tool-panel">
-        <summary><span>Ostatnie błędy skanowania</span><small>Adresy, których nie udało się pobrać</small></summary>
-        <div class="tool-content"><div id="crawlerFailures" class="crawler-failures"></div></div>
-      </details>
+    <section class="chart-dashboard" aria-label="Wykresy monitoringu">
+      <article class="dashboard-panel trend-panel"><div class="panel-heading"><div><h2>Aktywność w czasie</h2><p>Liczba wykrytych materiałów z podziałem na poziom ryzyka</p></div><span class="panel-mark">TREND</span></div><div class="chart-wrapper"><canvas id="trendsChart"></canvas></div></article>
+      <article class="dashboard-panel module-panel"><div class="panel-heading"><div><h2>Wyniki według modułu</h2><p>Materiały przypisane do obszarów analizy</p></div><span class="panel-mark">MODUŁY</span></div><div class="chart-wrapper"><canvas id="modulesChart"></canvas></div></article>
+    </section>
 
-      <details class="tool-panel">
-        <summary><span>Dodaj materiał do analizy</span><small>Wklej adres strony lub tekst</small></summary>
-        <div class="tool-content">
-          <div class="tab-nav"><button class="tab-btn active" id="tabUrlBtn" type="button">Adres URL</button><button class="tab-btn" id="tabTextBtn" type="button">Tekst / próbka</button></div>
-          <div id="tabUrlContent"><form id="urlScanForm" class="scan-form"><input id="scanUrl" type="url" placeholder="https://adres-strony.pl" required><input id="scanAuthor" placeholder="Autor / profil (opcjonalnie)"><button type="submit">Dodaj do kolejki</button></form></div>
-          <div id="tabTextContent" style="display:none"><textarea id="directText" rows="4" placeholder="Wklej treść posta, oferty lub materiału…"></textarea><div class="scan-form"><input id="directAuthor" placeholder="Autor / konto (opcjonalnie)"><button id="directScanBtn" type="button">Analizuj tekst</button></div><div class="sample-buttons"><button type="button" class="sample-btn" id="sampleM1">Próbka M1</button><button type="button" class="sample-btn" id="sampleM2">Próbka M2</button><button type="button" class="sample-btn" id="sampleM3">Próbka M3</button><button type="button" class="sample-btn" id="sampleOk">Próbka zgodna</button></div></div>
-        </div>
-      </details>
+    <section class="results-section" id="wyniki">
+      <div class="results-heading"><div><div class="eyebrow">WYKRYTE MATERIAŁY</div><h2>Wyniki do sprawdzenia</h2></div><div class="result-total"><b id="statTotal">0</b><span>ponad progiem</span></div></div>
+      <div class="stats-strip">
+        <div class="summary-stat"><i class="dot dot-red"></i><b id="statHigh">0</b><span>wysokie ryzyko</span></div>
+        <div class="summary-stat"><i class="dot dot-amber"></i><b id="statReview">0</b><span>czeka na weryfikację</span></div>
+        <div class="summary-stat"><i class="dot dot-green"></i><b id="findingsSaved">0</b><span>zapisanych materiałów</span></div>
+        <label class="threshold-control"><span>Minimalne ryzyko <b id="thresholdDisplay">0.70</b></span><input id="threshold" type="range" min="0" max="1" step="0.05" value="0.70"></label>
+      </div>
+      <div class="filterbar">
+        <label class="search-field"><span aria-hidden="true">⌕</span><input id="sourceFilter" placeholder="Szukaj źródła lub domeny…" autocomplete="off"></label>
+        <label class="select-field"><span>Moduł</span><select id="moduleFilter"><option value="">Wszystkie moduły</option><option value="1">M1 · Finfluencerzy</option><option value="2">M2 · Informacja o ryzyku</option><option value="3">M3 · Shadow Advisory</option></select></label>
+      </div>
+      <div id="liveAlertBox" class="alert-box"></div>
+      <div id="scanStatusBox" class="inline-message" role="status" aria-live="polite"></div>
+      <div id="findingsRows" class="result-list" aria-live="polite"><div class="empty-state">Ładowanie wyników…</div></div>
+    </section>
 
-      <details class="tool-panel">
-        <summary><span>Statystyki i trendy</span><small>Wykresy wyników według dnia i modułu</small></summary>
-        <div class="tool-content charts-grid"><div><h3>Incydenty w czasie</h3><div class="chart-wrapper"><canvas id="trendsChart"></canvas></div></div><div><h3>Wyniki według modułu</h3><div class="chart-wrapper"><canvas id="modulesChart"></canvas></div></div></div>
-      </details>
-      <footer>InvestWatch <span>•</span> Prototyp wspierający analizę, nie zastępuje oceny eksperta.</footer>
-    </aside>
+    <section class="lower-dashboard" aria-label="Narzędzia i informacje dodatkowe">
+      <article class="dashboard-panel review-panel"><div class="panel-heading"><div><h2>Jakość ręcznej weryfikacji</h2><p>Metryki liczone tylko z przypadków ocenionych przez człowieka</p></div></div>
+        <div class="stats-grid"><div class="stat-item"><b id="statFp">—</b><span>Odrzucone ponad progiem</span></div><div class="stat-item"><b id="statFn">—</b><span>Potwierdzone poniżej progu</span></div><div class="stat-item"><b id="statPrecision">—</b><span>Precyzja</span></div><div class="stat-item"><b id="statRecall">—</b><span>Czułość</span></div></div><p class="muted-note" id="reviewedSampleCount">Metryki pojawią się po oznaczeniu wyników jako potwierdzone lub odrzucone.</p>
+      </article>
+      <article class="dashboard-panel manual-panel"><div class="panel-heading"><div><h2>Dodaj materiał do analizy</h2><p>Wklej link albo treść do sprawdzenia</p></div></div>
+        <div class="tab-nav"><button class="tab-btn active" id="tabUrlBtn" type="button">Adres URL</button><button class="tab-btn" id="tabTextBtn" type="button">Tekst / próbka</button></div>
+        <div id="tabUrlContent"><form id="urlScanForm" class="scan-form"><input id="scanUrl" type="url" placeholder="https://adres-strony.pl" required><input id="scanAuthor" placeholder="Autor / profil (opcjonalnie)"><button type="submit">Dodaj do kolejki</button></form></div>
+        <div id="tabTextContent" style="display:none"><textarea id="directText" rows="4" placeholder="Wklej treść posta, oferty lub materiału…"></textarea><div class="scan-form"><input id="directAuthor" placeholder="Autor / konto (opcjonalnie)"><button id="directScanBtn" type="button">Analizuj tekst</button></div><div class="sample-buttons"><button type="button" class="sample-btn" id="sampleM1">Próbka M1</button><button type="button" class="sample-btn" id="sampleM2">Próbka M2</button><button type="button" class="sample-btn" id="sampleM3">Próbka M3</button><button type="button" class="sample-btn" id="sampleOk">Próbka zgodna</button></div></div>
+      </article>
+      <article class="dashboard-panel errors-panel"><div class="panel-heading"><div><h2>Ostatnie błędy pobierania</h2><p>Przyczyny, dla których strona nie trafiła do analizy</p></div></div><div id="crawlerFailures" class="crawler-failures"></div></article>
+    </section>
+    <footer>InvestWatch <span>•</span> Narzędzie wspiera analizę i nie zastępuje oceny eksperta.</footer>
   </main>
-  <script src="app.js?v=20261122-4"></script>
+  <script src="app.js?v=20261122-5"></script>
 </body>
 </html>

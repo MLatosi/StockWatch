@@ -227,10 +227,8 @@ async function updateCrawlerStatus() {
     const status = await getJson('/api/crawler/status');
     $('#pagesAnalyzed').textContent = status.completed_scans;
     $('#findingsSaved').textContent = status.analyzed_pages;
-    $('#findingsSavedDetail').textContent = status.analyzed_pages;
     $('#pagesQueued').textContent = status.queued_scans;
     $('#pagesFailed').textContent = status.failed_scans;
-    $('#pagesFailedDetail').textContent = status.failed_scans;
     const failures = status.recent_failures || [];
     $('#crawlerFailures').innerHTML = failures.length
       ? '<b>Ostatnie błędy skanowania</b>' + failures.map(f => `<div class="crawler-failure"><a href="${esc(f.url)}" target="_blank" rel="noreferrer">${esc(f.url)}</a><span>${esc(f.error || 'Brak opisu błędu')}</span></div>`).join('')
