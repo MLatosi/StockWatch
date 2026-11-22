@@ -3,142 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>#InvestWatch — Dashboard Analityczny UKNF</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#0b1220">
+  <title>InvestWatch — Wyniki monitoringu</title>
+  <link rel="stylesheet" href="style.css?v=20261122-3">
   <script src="chart.umd.js"></script>
 </head>
 <body>
-  <header>
-    <div class="logo-group">
-      <span class="mark">#</span>
-      <div>
-        <h1>InvestWatch — Dashboard Analityczny</h1>
-        <p>System automatycznej identyfikacji naruszeń i monitoringu ofert finansowych • UKNF HackNation 2026</p>
-      </div>
+  <header class="topbar">
+    <a class="brand" href="#wyniki" aria-label="InvestWatch, przejdź do wyników">
+      <span class="brand-mark">IW</span>
+      <span><b>InvestWatch</b><small>Monitoring rynku finansowego</small></span>
+    </a>
+    <div class="topbar-actions">
+      <span class="status-badge" id="connStatus"><i></i> Łączenie…</span>
+      <button class="btn-secondary" id="discoverBtn" type="button">Szukaj nowych stron</button>
     </div>
-    <div class="status-badge" id="connStatus">● System Online</div>
   </header>
 
   <main>
-    <!-- Sekcja Wykresów Trendów i Modułów -->
-    <section class="card">
-      <h2>📊 Trendy Incydentów i Rozkład Modułów Nadzorczych</h2>
-      <div class="charts-grid">
+    <section class="results-section" id="wyniki">
+      <div class="page-heading">
         <div>
-          <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Dynamika wykrytych incydentów w czasie (Wszystkie vs Wysokie Ryzyko)</div>
-          <div class="chart-wrapper">
-            <canvas id="trendsChart"></canvas>
-          </div>
+          <div class="eyebrow">CENTRUM ANALIZY</div>
+          <h1>Wyniki monitoringu</h1>
+          <p>Przeglądaj wykryte materiały, sprawdzaj uzasadnienia i kieruj sprawy do audytu.</p>
         </div>
-        <div>
-          <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Rozkład wg modułów (M1: Finfluencerzy, M2: Ryzyko, M3: Shadow Advisory)</div>
-          <div class="chart-wrapper">
-            <canvas id="modulesChart"></canvas>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Sekcja Kalibracji i Statystyk -->
-    <section class="card">
-      <h2>⚙️ Panel Kalibracji Progu Detekcji (Threshold)</h2>
-      <div class="controls-row">
-        <div class="control-group" style="flex: 2;">
-          <label>Próg odcięcia ryzyka (risk_score): <b id="thresholdDisplay" style="color: var(--accent);">0.70</b></label>
-          <input id="threshold" type="range" min="0" max="1" step="0.05" value="0.70">
-        </div>
-        <div class="control-group">
-          <label>Filtr źródła</label>
-          <input id="sourceFilter" placeholder="np. instagram, aura, bossa">
-        </div>
-        <div class="control-group">
-          <label>Moduł analityczny</label>
-          <select id="moduleFilter">
-            <option value="">Wszystkie moduły (M1, M2, M3)</option>
-            <option value="1">Moduł 1 — Finfluencerzy i podmioty trzecie</option>
-            <option value="2">Moduł 2 — Zgodność i informacja o ryzyku</option>
-            <option value="3">Moduł 3 — Shadow Advisory (brak licencji KNF)</option>
-          </select>
-        </div>
-        <button id="refreshBtn" style="height: 38px; align-self: flex-end;">Odśwież</button>
+        <div class="result-total"><b id="statTotal">0</b><span>wyników<br>ponad progiem</span></div>
       </div>
 
-      <div class="stats-grid" style="margin-top: 18px;">
-        <div class="stat-item"><b id="statTotal">0</b><span>Incydentów ponad progiem</span></div>
-        <div class="stat-item danger"><b id="statHigh">0</b><span>Wysokie ryzyko (≥ 0.70)</span></div>
-        <div class="stat-item warn"><b id="statReview">0</b><span>Oczekujące na audyt (new)</span></div>
-        <div class="stat-item"><b id="statFp">0</b><span>Szacowane False Positive</span></div>
-        <div class="stat-item"><b id="statFn">0</b><span>Szacowane False Negative</span></div>
+      <div class="filterbar">
+        <label class="search-field"><span aria-hidden="true">⌕</span><input id="sourceFilter" placeholder="Szukaj źródła lub domeny…" autocomplete="off"></label>
+        <label class="select-field"><span>Moduł</span><select id="moduleFilter">
+          <option value="">Wszystkie moduły</option>
+          <option value="1">M1 · Finfluencerzy</option>
+          <option value="2">M2 · Informacja o ryzyku</option>
+          <option value="3">M3 · Shadow Advisory</option>
+        </select></label>
+        <button class="icon-button" id="refreshBtn" type="button" title="Odśwież wyniki" aria-label="Odśwież wyniki">↻</button>
       </div>
-      <div class="card" id="crawlerLive" style="margin-top:14px;padding:14px;border:1px solid var(--line);">
-        <b id="crawlerState">● Skaner uruchomiony — oczekuje na nowe strony</b>
-        <div style="margin-top:6px;font-size:13px;color:var(--muted);">Zakończone skany: <b id="pagesAnalyzed">0</b> · Zapisane wyniki: <b id="findingsSaved">0</b> · W kolejce: <b id="pagesQueued">0</b> · Błędy: <b id="pagesFailed">0</b></div>
-        <div id="currentPage" style="margin-top:6px;font-size:13px;overflow-wrap:anywhere;"></div>
-      </div>
-    </section>
-
-    <!-- Sekcja Nowego Skanowania i Szybkich Próbek Demo -->
-    <section class="card">
-      <h2>🔍 Nowe Skanowanie i Scenariusze Demonstracyjne</h2>
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
-        <button type="button" id="discoverBtn">🌐 Szukaj publicznych stron teraz</button>
-        <span style="font-size:13px;color:var(--muted);">Automatyczne wyszukiwanie przez Google News RSS co minutę · hasła z listy monitorowania</span>
-      </div>
-      <div class="tab-nav">
-        <button class="tab-btn active" id="tabUrlBtn">Skanowanie URL</button>
-        <button class="tab-btn" id="tabTextBtn">Bezpośrednia Analiza Tekstu / Próbki Demo</button>
+      <div class="quick-stats">
+        <span><i class="dot dot-red"></i><b id="statHigh">0</b> wysokie ryzyko</span>
+        <span><i class="dot dot-amber"></i><b id="statReview">0</b> do weryfikacji</span>
+        <span id="scanSummary"><i class="dot dot-green"></i><b id="pagesAnalyzed">0</b> skanów zakończonych</span>
+        <span class="scan-queue">Kolejka <b id="pagesQueued">0</b></span>
       </div>
 
-      <!-- Skanowanie URL -->
-      <div id="tabUrlContent">
-        <form id="urlScanForm" style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <input id="scanUrl" type="url" placeholder="https://adres-strony-lub-profilu.pl" required style="flex: 2; min-width: 280px;">
-          <input id="scanAuthor" placeholder="Autor / Profil (np. @finfluencer)" style="flex: 1; min-width: 180px;">
-          <button type="submit">Dodaj do kolejki crawlingu</button>
-        </form>
-      </div>
-
-      <!-- Bezpośrednia analiza tekstu i próbki demo -->
-      <div id="tabTextContent" style="display: none;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Wklej treść oferty lub wybierz gotowy scenariusz demo przygotowany dla Jury:</div>
-        <textarea id="directText" rows="4" style="width: 100%;" placeholder="Wklej treść posta, oferty lub materiału promocyjnego..."></textarea>
-        <div style="display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; align-items: center;">
-          <input id="directAuthor" placeholder="Autor / Konto (opcjonalnie)" style="flex: 1;">
-          <button id="directScanBtn">Analizuj treść natychmiast</button>
-        </div>
-        <div class="sample-buttons">
-          <button type="button" class="sample-btn" id="sampleM1">✨ Próbka M1: Finfluencer Instagram z kodem XTB</button>
-          <button type="button" class="sample-btn" id="sampleM2">✨ Próbka M2: Ostrzeżenie i gwarancja KNF (Global Trade)</button>
-          <button type="button" class="sample-btn" id="sampleM3">✨ Próbka M3: Shadow Family Office (Aura Wealth)</button>
-          <button type="button" class="sample-btn" id="sampleOk">✨ Próbka Zgodna: Komunikat DM BOŚ z ryzykiem</button>
-        </div>
-      </div>
-
-      <div id="scanStatusBox" style="margin-top: 12px; font-size: 14px; color: var(--accent); font-weight: 600;"></div>
-    </section>
-
-    <!-- Tabela Wyników Incydentów -->
-    <section class="card">
-      <h2>📋 Rejestr Wykrytych Incydentów</h2>
       <div id="liveAlertBox" class="alert-box"></div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 100px;">Ryzyko</th>
-            <th style="width: 110px;">Moduły</th>
-            <th style="width: 180px;">Źródło i Autor</th>
-            <th>Uzasadnienie i Audyt 18 Reguł KNF</th>
-            <th style="width: 110px;">Zrzut</th>
-            <th style="width: 130px;">Status</th>
-          </tr>
-        </thead>
-        <tbody id="findingsRows">
-          <tr><td colspan="6" style="text-align: center; color: var(--muted);">Ładowanie danych...</td></tr>
-        </tbody>
-      </table>
+      <div id="scanStatusBox" class="inline-message" aria-live="polite"></div>
+      <div id="findingsRows" class="result-list" aria-live="polite">
+        <div class="empty-state">Ładowanie wyników…</div>
+      </div>
     </section>
-  </main>
 
-  <script src="app.js"></script>
+    <aside class="secondary-tools">
+      <details class="tool-panel">
+        <summary><span>Ustawienia widoku</span><small>Próg ryzyka oraz licznik zapisanych wyników</small></summary>
+        <div class="tool-content">
+          <label class="threshold-label">Minimalny poziom ryzyka <b id="thresholdDisplay">0.70</b></label>
+          <input id="threshold" type="range" min="0" max="1" step="0.05" value="0.70">
+          <p class="muted-note">Wyniki poniżej progu są ukryte.</p>
+          <div class="stats-grid">
+            <div class="stat-item"><b id="findingsSaved">0</b><span>Unikalne zapisane treści</span></div>
+            <div class="stat-item"><b id="pagesFailed">0</b><span>Błędy pobierania</span></div>
+            <div class="stat-item"><b id="statFp">—</b><span>Odrzucone wyniki ponad progiem</span></div>
+            <div class="stat-item"><b id="statFn">—</b><span>Potwierdzone wyniki poniżej progu</span></div>
+            <div class="stat-item"><b id="statPrecision">—</b><span>Precyzja w ocenionych wynikach</span></div>
+            <div class="stat-item"><b id="statRecall">—</b><span>Czułość w ocenionych wynikach</span></div>
+          </div>
+          <p class="muted-note" id="reviewedSampleCount">Metryki pojawią się po oznaczeniu wyników jako potwierdzone lub odrzucone.</p>
+        </div>
+      </details>
+
+      <details class="tool-panel">
+        <summary><span>Skaner i kolejka</span><small id="crawlerState">Sprawdzam status…</small></summary>
+        <div class="tool-content"><div id="currentPage" class="current-page"></div><div id="crawlerFailures" class="crawler-failures"></div></div>
+      </details>
+
+      <details class="tool-panel">
+        <summary><span>Dodaj materiał do analizy</span><small>Wklej adres strony lub tekst</small></summary>
+        <div class="tool-content">
+          <div class="tab-nav"><button class="tab-btn active" id="tabUrlBtn" type="button">Adres URL</button><button class="tab-btn" id="tabTextBtn" type="button">Tekst / próbka</button></div>
+          <div id="tabUrlContent"><form id="urlScanForm" class="scan-form"><input id="scanUrl" type="url" placeholder="https://adres-strony.pl" required><input id="scanAuthor" placeholder="Autor / profil (opcjonalnie)"><button type="submit">Dodaj do kolejki</button></form></div>
+          <div id="tabTextContent" style="display:none"><textarea id="directText" rows="4" placeholder="Wklej treść posta, oferty lub materiału…"></textarea><div class="scan-form"><input id="directAuthor" placeholder="Autor / konto (opcjonalnie)"><button id="directScanBtn" type="button">Analizuj tekst</button></div><div class="sample-buttons"><button type="button" class="sample-btn" id="sampleM1">Próbka M1</button><button type="button" class="sample-btn" id="sampleM2">Próbka M2</button><button type="button" class="sample-btn" id="sampleM3">Próbka M3</button><button type="button" class="sample-btn" id="sampleOk">Próbka zgodna</button></div></div>
+        </div>
+      </details>
+
+      <details class="tool-panel">
+        <summary><span>Statystyki i trendy</span><small>Wykresy wyników według dnia i modułu</small></summary>
+        <div class="tool-content charts-grid"><div><h3>Incydenty w czasie</h3><div class="chart-wrapper"><canvas id="trendsChart"></canvas></div></div><div><h3>Wyniki według modułu</h3><div class="chart-wrapper"><canvas id="modulesChart"></canvas></div></div></div>
+      </details>
+      <footer>InvestWatch <span>•</span> Prototyp wspierający analizę, nie zastępuje oceny eksperta.</footer>
+    </aside>
+  </main>
+  <script src="app.js?v=20261122-3"></script>
 </body>
 </html>

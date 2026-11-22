@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, HttpUrl
 
 from .knf_registry import find_knf_entities
-from .risk_rules import evaluate_all_rules, contains_any
+from .risk_rules import RISK_CRITERIA_META, evaluate_all_rules, contains_any
 from .ollama_client import check_ollama_health, query_ollama
 
 app = FastAPI(title="InvestWatch AI Engine", version="0.4.0")
@@ -141,15 +141,9 @@ async def analyze(payload: AnalysisRequest):
         modules.append(3)
         reason_parts.append("[M3 Shadow Advisory] Podmiot oferuje usługi doradztwa inwestycyjnego lub zarządzania portfelem bez wymaganej licencji firmy inwestycyjnej UKNF (art. 76 ustawy o obrocie).")
 
-    # 4. Inferencja Ollama (Gemma 2)
-    ollama_result = await query_ollama(text)
-    if ollama_result and ollama_result.get("available"):
-        if ollama_result.get("summary"):
-            reason_parts.append(f"[LLM Gemma2] {ollama_result['summary']}")
-        # Jeśli Ollama wykryła wysokie ryzyko, podbijamy pewność
-        if ollama_result.get("risk_level") == "high":
-            if 2 not in modules and compliance_issues:
-                modules.append(2)
+    # 4. Model lokalny sprawdza kontekst kandydatur wskazanych przez reguły.
+    # Jego opinia jest widoczna dla analityka, ale sama nie zmienia wyniku ryzyka.
+    ollama_result = await query_ollama(text, compliance_issues)
 
     # 5. Obliczenie wskaźnika ryzyka (risk_score: 0.00 - 1.00)
     score = 0.05
@@ -198,7 +192,13 @@ async def analyze(payload: AnalysisRequest):
         "compliance_audit": {
             "issues": compliance_issues,
             "passed": len(compliance_issues) == 0,
-            "total_rules_evaluated": len(compliance_issues)
+            "total_rules_evaluated": len(RISK_CRITERIA_META),
+            "analysis_scope": "tekst",
+            "limitations": [
+                "W tej wersji ocena dotyczy tekstu. Rozmiar i kontrast ostrzeżenia, jego położenie oraz widoczność na ekranie nie są mierzone przez przeglądarkę."
+            ],
+            "model_review": ollama_result,
+            "score_method": "reguły i sygnały deterministyczne; model nie zmienia wyniku",
         },
         "ollama_evaluation": ollama_result,
         "vector_meta": {

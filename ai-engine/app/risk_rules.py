@@ -1,4 +1,4 @@
-"""Kompleksowy moduł weryfikacji 18 reguł prawnych UKNF / MiFID II.
+"""Moduł tekstowej weryfikacji kryteriów UKNF / MiFID II.
 
 Źródło: ZASÓB DLA UCZESTNIKÓW - InvestWatch - kryteria oceny informacji o ryzyku.docx
 Podstawa prawna: Rozporządzenie delegowane Komisji (UE) 2017/565 (art. 44) oraz MiFID II (art. 24).
@@ -31,17 +31,33 @@ def contains_any(text_lower: str, *phrases) -> list[str]:
     return [p for p in phrases if p in text_lower]
 
 def evaluate_all_rules(text: str, knf_companies_found: list[dict], author: str | None = None) -> list[dict]:
-    """Ocenia tekst pod kątem wszystkich 18 reguł UKNF."""
+    """Ocenia dostępny tekst według zdefiniowanych kryteriów UKNF."""
     low = text.lower()
     issues = []
 
     def add_violation(rule_key, detail: str):
         title, legal_basis = RISK_CRITERIA_META[rule_key]
+        matched = [phrase for phrase in evidence_cues.get(str(rule_key), []) if phrase in low]
+        cue = matched[0] if matched else ""
+        if cue:
+            cue_at = low.find(cue)
+            starts = [low.rfind(mark, 0, cue_at) for mark in (".", "!", "?", "\n")]
+            start = max(starts) + 1
+            ends = [pos for mark in (".", "!", "?", "\n") if (pos := low.find(mark, cue_at + len(cue))) >= 0]
+            end = min(ends) if ends else len(text)
+            quote = text[start:end].strip()
+        else:
+            quote = text[:240].strip()
         issues.append({
             "id": str(rule_key),
             "title": title,
             "detail": detail,
-            "legal_basis": legal_basis
+            "legal_basis": legal_basis,
+            "evidence": {
+                "quote": quote[:320],
+                "matched_terms": matched[:5],
+                "method": "Dopasowanie reguły do pobranego tekstu",
+            },
         })
 
     # Sygnały kluczowe
@@ -54,6 +70,26 @@ def evaluate_all_rules(text: str, knf_companies_found: list[dict], author: str |
     promo_signals = contains_any(low, "kod promocyjny", "reflid", "afiliacja", "współpraca", "partner",
                                  "polecam", "reklama", "promocja", "#ad", "#reklama", "#wspolpraca",
                                  "#sponsorowane", "skorzystaj z linku", "załóż konto z kodem")
+
+    evidence_cues = {
+        "1": promo_signals + profit_terms, "2": promo_signals + profit_terms, "3": profit_terms,
+        "4": ["drobnym drukiem", "mała czcionka", "font-size: 8px", "font-size: 9px", "font-size: 10px", "text-xs"],
+        "5": ["opacity: 0", "display: none", "color: #fff; background: #fff", "niewidoczn", "słaby kontrast", "szary tekst na szarym tle"],
+        "6": risk_terms + ["stopka", "sekcja legal", "przypis na dole", "w regulaminie na stronie", "nota prawna"],
+        "7": ["kliknij aby rozwinąć ryzyko", "ryzyko dostępne po kliknięciu", "zobacz ostrzeżenie w osobnym linku", "więcej informacji pod linkiem", "rozwinięcie wymagane"],
+        "8": ["overflow: hidden", "ucięty tekst", "obcięty komunikat", "niewidoczne na telefonie"],
+        "9": ["delta-neutral", "gamma scalping", "var 99%", "hedging krzyżowy", "struktura contango", "backwardation"],
+        "10": ["cfds are complex instruments and come with a high risk", "capital at risk", "past performance is no guarantee", "your capital may be at risk", "inwestuj", "zysk", "zarabiaj", "akcje", "giełda"],
+        "11": ["najlepszy broker", "jesteśmy lepsi niż", "nr 1 w polsce", "bezkonkurencyjny", "najtańszy dom maklerski"],
+        "12a": ["wyniki historyczne", "stopa zwrotu za ostatnie", "zysk w ubiegłym roku", "zarobiliśmy w 202", "wykres stóp zwrotu"],
+        "12b": ["wyniki historyczne", "stopa zwrotu za ostatnie", "zysk w ubiegłym roku", "zarobiliśmy w 202", "wykres stóp zwrotu"],
+        "13": ["rekordowy zysk 300%", "wyniki historyczne:", "historyczna stopa zwrotu"],
+        "14": ["wyniki historyczne", "stopa zwrotu za ostatnie", "zysk w ubiegłym roku", "zarobiliśmy w 202", "wykres stóp zwrotu"],
+        "15": ["prognozujemy wzrost", "wzrośnie o minimum", "przewidujemy zysk", "będzie rosnąć", "prognoza stóp zwrotu"],
+        "16": ["brak podatku", "optymalizacja podatkowa", "korzyści podatkowe", "podatek belki", "zwolnienie z opodatkowania"],
+        "17": ["zatwierdzony przez knf", "aprobata knf", "rekomendowany przez knf", "posiada akredytację knf"],
+        "18": ["w pełni bezpiecz", "gwarancja bezpieczeństwa dzięki knf", "pod nadzorem knf co gwarantuje zysk", "spełniamy rygorystyczne wymogi knf więc nie stracisz"],
+    }
 
     # Reguła 1: Identyfikacja firmy (art. 44 ust. 2 lit. a)
     # Sprawdza, czy materiał zawiera oficjalną nazwę firmy inwestycyjnej

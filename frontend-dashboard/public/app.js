@@ -139,60 +139,69 @@ async function loadData() {
     $('#statTotal').textContent = summary.total;
     $('#statHigh').textContent = summary.high_risk;
     $('#statReview').textContent = summary.new;
-    $('#statFp').textContent = summary.estimated_false_positive;
-    $('#statFn').textContent = summary.estimated_false_negative;
+    const reviewed = summary.reviewed_metrics || {};
+    $('#statFp').textContent = reviewed.false_positive ?? 0;
+    $('#statFn').textContent = reviewed.false_negative ?? 0;
+    $('#statPrecision').textContent = reviewed.precision == null ? '—' : reviewed.precision + '%';
+    $('#statRecall').textContent = reviewed.recall == null ? '—' : reviewed.recall + '%';
+    $('#reviewedSampleCount').textContent = `Metryki liczą ${reviewed.reviewed_count || 0} ręcznie ocenionych wyników. Zmień status wyniku, aby dodać ocenę.`;
 
     // Renderowanie wierszy tabeli
     const rows = $('#findingsRows');
     if (!findings.length) {
-      rows.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">Brak rekordów spełniających wybrane kryteria i próg ryzyka.</td></tr>';
+      rows.innerHTML = '<div class="empty-state"><b>Brak wyników dla tych filtrów</b><span>Obniż próg ryzyka albo zmień wyszukiwaną domenę lub moduł.</span></div>';
+      updateCharts();
       return;
     }
 
     rows.innerHTML = findings.map(item => {
       let scoreClass = 'score-low';
-      if (item.risk_score >= 0.70) scoreClass = 'score-high';
-      else if (item.risk_score >= 0.40) scoreClass = 'score-medium';
+      let riskLabel = 'Niskie';
+      if (item.risk_score >= 0.70) { scoreClass = 'score-high'; riskLabel = 'Wysokie'; }
+      else if (item.risk_score >= 0.40) { scoreClass = 'score-medium'; riskLabel = 'Umiarkowane'; }
 
-      const moduleBadges = item.modules.length
-        ? item.modules.map(m => `<span class="badge badge-m${m}">M${m}</span>`).join(' ')
-        : '<span style="color: var(--muted);">—</span>';
+      const modules = item.modules || [];
+      const moduleNames = { 1: 'Finfluencerzy', 2: 'Informacja o ryzyku', 3: 'Shadow Advisory' };
+      const moduleBadges = modules.length
+        ? modules.map(m => `<span class="badge badge-m${m}">M${m} · ${moduleNames[m] || 'Moduł'}</span>`).join('')
+        : '<span class="badge badge-neutral">Brak modułu</span>';
 
-      const auditDetails = item.audit && item.audit.issues && item.audit.issues.length
-        ? `<details>
-             <summary>Audyt 18 reguł KNF: ${item.audit.issues.length} naruszeń</summary>
-             ${item.audit.issues.map(i => `
+      const issues = item.audit?.issues || [];
+      const modelReview = item.audit?.model_review;
+      const modelVerdict = { supports: 'wspiera przesłankę', contradicts: 'wskazuje inny kontekst', uncertain: 'nie rozstrzyga' };
+      const auditDetails = item.audit
+        ? `<details class="audit-details">
+             <summary>Przesłanki tekstowe: ${issues.length} · kontrola modelu: ${modelReview?.available ? esc(modelReview.model) : 'niedostępna'}</summary>
+             ${issues.map(i => `
                <div class="issue-item">
                  <b>R${esc(i.id)}: ${esc(i.title)}</b> — ${esc(i.detail)}
                  <div class="issue-legal">Podstawa: ${esc(i.legal_basis)}</div>
+                 ${i.evidence?.quote ? `<blockquote class="evidence-quote">„${esc(i.evidence.quote)}”<small>Fragment, na który trafiła reguła${i.evidence.matched_terms?.length ? ': ' + esc(i.evidence.matched_terms.join(', ')) : ''}</small></blockquote>` : ''}
+                 ${modelReview?.available && modelReview.rule_reviews?.some(r => r.id === String(i.id)) ? modelReview.rule_reviews.filter(r => r.id === String(i.id)).map(r => `<div class="model-review">Model pomocniczo: <b>${esc(modelVerdict[r.verdict] || r.verdict)}</b>${r.quote_verified && r.quote ? ` · cytat: „${esc(r.quote)}”` : ''}</div>`).join('') : ''}
                </div>
              `).join('')}
+             ${modelReview?.available ? `<div class="model-summary"><b>Podsumowanie kontekstu (${esc(modelReview.model)})</b><p>${esc(modelReview.summary || 'Model nie zwrócił podsumowania.')}</p>${modelReview.additional_signals?.length ? `<div class="model-signals"><b>Dodatkowe fragmenty do sprawdzenia</b>${modelReview.additional_signals.map(s => `<div><span>${esc(s.label)}</span><blockquote>„${esc(s.quote)}”</blockquote></div>`).join('')}</div>` : ''}<small>Model pomaga sprawdzić kontekst cytatów. Nie ustala wyniku ryzyka ani nie tworzy naruszeń.</small></div>` : `<div class="model-summary"><b>Model lokalny</b><p>${esc(modelReview?.error || 'Brak odpowiedzi Ollamy dla tej analizy.')}</p><small>Wynik ryzyka wyliczono z reguł i sygnałów deterministycznych.</small></div>`}
+             ${item.audit.limitations?.length ? `<div class="audit-limitations">Zakres tej analizy: ${item.audit.limitations.map(esc).join(' ')}</div>` : ''}
            </details>`
         : '';
 
-      const snapshotBtn = `<a href="/api/findings/${item.id}/snapshot" target="_blank" style="color: var(--accent); text-decoration: none; font-size: 13px;">👁️ Podgląd</a>`;
+      const snapshotBtn = `<a class="result-link" href="/api/findings/${item.id}/snapshot" target="_blank" rel="noreferrer">Podgląd zrzutu ↗</a>`;
+      const sourceUrl = esc(item.url);
+      const created = item.created_at ? new Date(item.created_at).toLocaleString('pl-PL', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      const excerpt = item.text ? esc(item.text.slice(0, 260)) + (item.text.length > 260 ? '…' : '') : '';
 
       return `
-        <tr>
-          <td><span class="score-badge ${scoreClass}">${item.risk_score.toFixed(2)}</span></td>
-          <td>${moduleBadges}</td>
-          <td>
-            <a href="${esc(item.url)}" target="_blank" rel="noreferrer" style="color: var(--accent); text-decoration: none; font-weight: 600;">${esc(item.source)}</a>
-            ${item.author ? `<div style="font-size: 12px; color: var(--muted);">👤 ${esc(item.author)}</div>` : ''}
-          </td>
-          <td>
-            <div>${esc(item.reason)}</div>
+        <article class="result-card">
+          <div class="risk-column"><span class="risk-score ${scoreClass}">${item.risk_score.toFixed(2)}</span><span class="risk-label">${riskLabel} ryzyko</span></div>
+          <div class="result-main">
+            <div class="result-meta"><a class="source-name" href="${sourceUrl}" target="_blank" rel="noreferrer">${esc(item.source)} ↗</a>${item.author ? `<span class="author">${esc(item.author)}</span>` : ''}${created ? `<time>${esc(created)}</time>` : ''}</div>
+            <div class="module-list">${moduleBadges}</div>
+            <p class="result-reason">${esc(item.reason)}</p>
+            ${excerpt ? `<details class="content-preview"><summary>Treść materiału</summary><p>${excerpt}</p></details>` : ''}
             ${auditDetails}
-          </td>
-          <td>${snapshotBtn}</td>
-          <td>
-            <select data-id="${item.id}" style="padding: 4px 8px; font-size: 13px;">
-              ${['new', 'reviewing', 'confirmed', 'dismissed'].map(s => `
-                <option value="${s}" ${s === item.status ? 'selected' : ''}>${s}</option>
-              `).join('')}
-            </select>
-          </td>
-        </tr>
+          </div>
+          <div class="result-actions">${snapshotBtn}<label class="status-control"><span>Status</span><select data-id="${item.id}">${[['new','Do weryfikacji'],['reviewing','W trakcie'],['confirmed','Potwierdzone'],['dismissed','Odrzucone']].map(([value,label]) => `<option value="${value}" ${value === item.status ? 'selected' : ''}>${label}</option>`).join('')}</select></label></div>
+        </article>
       `;
     }).join('');
 
@@ -209,6 +218,10 @@ async function updateCrawlerStatus() {
     $('#findingsSaved').textContent = status.analyzed_pages;
     $('#pagesQueued').textContent = status.queued_scans;
     $('#pagesFailed').textContent = status.failed_scans;
+    const failures = status.recent_failures || [];
+    $('#crawlerFailures').innerHTML = failures.length
+      ? '<b>Ostatnie błędy skanowania</b>' + failures.map(f => `<div class="crawler-failure"><a href="${esc(f.url)}" target="_blank" rel="noreferrer">${esc(f.url)}</a><span>${esc(f.error || 'Brak opisu błędu')}</span></div>`).join('')
+      : '';
     if (status.is_working) {
       const stage = status.current.stage === 'fetching_page' ? 'Pobieram stronę' : 'Analizuję treść';
       $('#crawlerState').textContent = '● ' + stage + '…';

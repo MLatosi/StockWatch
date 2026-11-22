@@ -471,10 +471,17 @@ def watchlist():
 
 @app.get("/crawler/status")
 def crawler_status(db: Session = Depends(get_db)):
+    recent_failures = db.scalars(
+        select(ScanJob).where(ScanJob.status == "failed").order_by(ScanJob.created_at.desc()).limit(5)
+    ).all()
     return {
         "analyzed_pages": db.scalar(select(func.count(Finding.id))) or 0,
         "completed_scans": db.scalar(select(func.count(ScanJob.id)).where(ScanJob.status == "completed")) or 0,
         "failed_scans": db.scalar(select(func.count(ScanJob.id)).where(ScanJob.status == "failed")) or 0,
+        "recent_failures": [
+            {"id": job.id, "url": job.url, "error": job.error, "created_at": job.created_at.isoformat()}
+            for job in recent_failures
+        ],
         "queued_scans": db.scalar(select(func.count(ScanJob.id)).where(ScanJob.status == "queued")) or 0,
         "is_working": active_scan["job_id"] is not None,
         "current": active_scan.copy(),
@@ -562,13 +569,27 @@ def summary(threshold: float = 0.70, db: Session = Depends(get_db)):
     threshold = max(0.0, min(1.0, threshold))
     rows = db.scalars(select(Finding)).all()
     visible = [x for x in rows if x.risk_score >= threshold]
+    reviewed = [x for x in rows if x.status in {"confirmed", "dismissed"}]
+    true_positive = sum(x.status == "confirmed" and x.risk_score >= threshold for x in reviewed)
+    false_positive = sum(x.status == "dismissed" and x.risk_score >= threshold for x in reviewed)
+    false_negative = sum(x.status == "confirmed" and x.risk_score < threshold for x in reviewed)
+    true_negative = sum(x.status == "dismissed" and x.risk_score < threshold for x in reviewed)
+    precision_denominator = true_positive + false_positive
+    recall_denominator = true_positive + false_negative
     return {
         "threshold": threshold,
         "total": len(visible),
         "high_risk": sum(x.risk_score >= 0.70 for x in visible),
         "new": sum(x.status == "new" for x in visible),
-        "estimated_false_positive": sum(threshold <= x.risk_score < min(1.0, threshold + 0.15) for x in visible),
-        "estimated_false_negative": sum(x.risk_score < threshold and x.risk_score >= max(0.0, threshold - 0.15) for x in rows),
+        "reviewed_metrics": {
+            "reviewed_count": len(reviewed),
+            "false_positive": false_positive,
+            "false_negative": false_negative,
+            "true_positive": true_positive,
+            "true_negative": true_negative,
+            "precision": round(100 * true_positive / precision_denominator, 1) if precision_denominator else None,
+            "recall": round(100 * true_positive / recall_denominator, 1) if recall_denominator else None,
+        },
         "by_source": Counter(x.source for x in visible),
         "by_module": {
             "m1": sum(1 in x.modules for x in visible),
