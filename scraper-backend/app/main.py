@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+import time
 import xml.etree.ElementTree as ET
 from collections import Counter
 from datetime import datetime, timezone, timedelta
@@ -93,6 +94,7 @@ class Hub:
 
 hub, jobs = Hub(), asyncio.Queue()
 active_scan = {"job_id": None, "url": None, "author": None, "stage": "idle", "started_at": None}
+discovery_status = {"stage": "waiting", "last_started_at": None, "last_finished_at": None, "last_found": 0, "last_error": None, "next_run_at": time.time() + 20}
 app = FastAPI(title="#InvestWatch Ingestion API", version="0.4.0")
 
 # Lista celów do okresowego monitoringu (CronJob / Watchlist)
@@ -393,14 +395,19 @@ async def discover_public_pages(db: Session, limit: int = 30):
 async def periodic_scheduler():
     await asyncio.sleep(20)
     while True:
+        discovery_status.update({"stage": "searching", "last_started_at": datetime.now(timezone.utc).isoformat(), "last_error": None})
         try:
             with SessionLocal() as db:
                 found = await discover_public_pages(db)
+                discovery_status["last_found"] = len(found)
                 if found:
                     logger.info("RSS discovery queued %s public pages", len(found))
         except Exception as exc:
+            discovery_status["last_error"] = str(exc)[:300]
             logger.warning("Public RSS discovery failed: %s", exc)
-        await asyncio.sleep(int(os.getenv("DISCOVERY_INTERVAL_SECONDS", "60")))
+        interval = int(os.getenv("DISCOVERY_INTERVAL_SECONDS", "60"))
+        discovery_status.update({"stage": "waiting", "last_finished_at": datetime.now(timezone.utc).isoformat(), "next_run_at": time.time() + interval})
+        await asyncio.sleep(interval)
 
 @app.on_event("startup")
 async def startup():
@@ -451,16 +458,23 @@ def crawler_status(db: Session = Depends(get_db)):
         "queued_scans": db.scalar(select(func.count(ScanJob.id)).where(ScanJob.status == "queued")) or 0,
         "is_working": active_scan["job_id"] is not None,
         "current": active_scan.copy(),
+        "discovery": discovery_status.copy(),
+        "watchlist_count": len(SEARCH_TERMS),
         "discovery_interval_seconds": int(os.getenv("DISCOVERY_INTERVAL_SECONDS", "60")),
     }
 
 @app.post("/discover")
 async def discover_now(db: Session = Depends(get_db)):
+    discovery_status.update({"stage": "searching", "last_started_at": datetime.now(timezone.utc).isoformat(), "last_error": None})
     try:
         found = await discover_public_pages(db)
+        discovery_status.update({"last_found": len(found), "last_finished_at": datetime.now(timezone.utc).isoformat()})
         return {"source": "Google News RSS", "queued": len(found), "items": found}
     except httpx.HTTPError as exc:
+        discovery_status["last_error"] = str(exc)[:300]
         raise HTTPException(502, f"Public search source unavailable: {exc}")
+    finally:
+        discovery_status["stage"] = "waiting"
 
 @app.get("/findings")
 def findings(min_risk: float = 0, source: str | None = None, module: int | None = None, db: Session = Depends(get_db)):

@@ -213,10 +213,22 @@ async function updateCrawlerStatus() {
       $('#crawlerState').textContent = '● ' + stage + '…';
       $('#crawlerState').style.color = 'var(--accent)';
       $('#currentPage').innerHTML = 'Teraz: <a target="_blank" rel="noreferrer" href="' + esc(status.current.url) + '">' + esc(status.current.url) + '</a>';
+    } else if (status.discovery.stage === 'searching') {
+      $('#crawlerState').textContent = '● Szukam nowych publicznych stron…';
+      $('#crawlerState').style.color = 'var(--accent)';
+      $('#currentPage').textContent = 'Przeszukuję Google News RSS po ' + (status.watchlist_count || 20) + ' hasłach.';
     } else {
-      $('#crawlerState').textContent = '● Skaner uruchomiony — oczekuje na nowe strony';
+      const secondsLeft = Math.max(0, Math.ceil(status.discovery.next_run_at - Date.now() / 1000));
+      const minutes = Math.floor(secondsLeft / 60);
+      const seconds = secondsLeft % 60;
+      $('#crawlerState').textContent = '● Skaner działa — kolejne wyszukiwanie za ' + (minutes ? minutes + ' min ' : '') + seconds + ' s';
       $('#crawlerState').style.color = 'var(--muted)';
-      $('#currentPage').textContent = 'Automatyczne wyszukiwanie sprawdza publiczne wyniki co minutę.';
+      if (status.discovery.last_error) {
+        $('#currentPage').textContent = 'Ostatnie wyszukiwanie nie powiodło się: ' + status.discovery.last_error;
+      } else {
+        const lastRun = status.discovery.last_finished_at ? new Date(status.discovery.last_finished_at).toLocaleTimeString('pl-PL') : 'jeszcze się nie odbyło';
+        $('#currentPage').textContent = 'Ostatnie wyszukiwanie: ' + lastRun + ' · nowych adresów: ' + status.discovery.last_found + '. Użyj „Szukaj publicznych stron teraz”, aby uruchomić ręcznie.';
+      }
     }
   } catch (err) {
     $('#crawlerState').textContent = '● Nie można pobrać statusu skanera';
