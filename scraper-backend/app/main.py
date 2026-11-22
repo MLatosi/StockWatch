@@ -20,6 +20,7 @@ from pydantic import BaseModel, HttpUrl
 from sqlalchemy import DateTime, Float, Integer, JSON, String, Text, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from app.watchlist import WATCHLIST as SEARCH_TERMS
+from app.public_sources import PUBLIC_RSS_FEEDS, PUBLIC_SITEMAPS, parse_feed, parse_sitemap
 
 logger = logging.getLogger("investwatch.backend")
 
@@ -94,7 +95,7 @@ class Hub:
 
 hub, jobs = Hub(), asyncio.Queue()
 active_scan = {"job_id": None, "url": None, "author": None, "stage": "idle", "started_at": None}
-discovery_status = {"stage": "waiting", "last_started_at": None, "last_finished_at": None, "last_found": 0, "last_error": None, "next_run_at": time.time() + 20}
+discovery_status = {"stage": "waiting", "last_started_at": None, "last_finished_at": None, "last_found": 0, "last_error": None, "source_results": {}, "source_errors": [], "next_run_at": time.time() + 20}
 app = FastAPI(title="#InvestWatch Ingestion API", version="0.4.0")
 
 # Lista celów do okresowego monitoringu (CronJob / Watchlist)
@@ -365,45 +366,152 @@ AUTONOMOUS_FEED = [
     }
 ]
 
-async def discover_public_pages(db: Session, limit: int = 30):
-    """Search Google News RSS for public web pages matching the configured watch terms."""
-    headers = {"User-Agent": "InvestWatch/0.5 (public RSS discovery)"}
-    found, seen, feed_items, relevant_items = [], set(), 0, 0
-    finance_context = ("giełd", "akcj", "obligac", "maklersk", "broker", "trading", "inwestor", "kapitał", "etf", "forex", "cfd", "kryptowalut", "fundusz", "doradztw inwestycyjn", "portfel inwestycyjn", "instrument finansow", "zysk", "stopa zwrotu")
+async def discover_public_pages(db: Session, limit: int = 10):
+    """Discover candidates from Google News plus public investment RSS and sitemaps."""
+    headers = {"User-Agent": "InvestWatch/0.6 (public feed reader; contact: local prototype)"}
+    found: list[dict] = []
+    seen: set[str] = set()
+    errors: list[dict[str, str]] = []
+    sources: dict[str, dict[str, int]] = {}
+    finance_context = (
+        "giełd", "akcj", "obligac", "maklersk", "broker", "trading", "inwestor", "kapitał",
+        "etf", "forex", "cfd", "kryptowalut", "fundusz", "doradztw inwestycyjn",
+        "portfel inwestycyjn", "instrument finansow", "zysk", "stopa zwrotu", "gpw", "wig",
+        "dywidend", "emisj", "rekomendac", "knf", "inwestyc",
+    )
+
+    async def enqueue(url: str, title: str, source_name: str) -> bool:
+        url = url.strip()
+        if len(found) >= limit or not url.startswith("https://") or url in seen:
+            return False
+        seen.add(url)
+        source_author = f"{source_name}: {title}"[:250]
+        if db.scalar(select(Finding.id).where(Finding.url == url)):
+            return False
+        existing_job = db.scalar(select(ScanJob.id).where(
+            ScanJob.url == url,
+            ScanJob.status.in_(["queued", "processing", "completed", "failed"]),
+        ))
+        if existing_job:
+            return False
+        if source_name == "Google News RSS":
+            same_title_job = db.scalar(select(ScanJob.id).where(ScanJob.author == source_author))
+            same_title_finding = db.scalar(select(Finding.id).where(Finding.author == source_author))
+            if same_title_job or same_title_finding:
+                return False
+        job = ScanJob(url=url, author=source_author)
+        db.add(job)
+        db.flush()
+        await jobs.put(job.id)
+        found.append({"url": url, "title": title, "source": source_name, "job_id": job.id})
+        sources.setdefault(source_name, {"items": 0, "relevant": 0, "queued": 0})["queued"] += 1
+        return True
+
     groups = [SEARCH_TERMS[i:i + 4] for i in range(0, len(SEARCH_TERMS), 4)]
-    async with httpx.AsyncClient(timeout=25, follow_redirects=True, headers=headers) as client:
-        for group in groups:
+    google_name = "Google News RSS"
+    sources[google_name] = {"items": 0, "relevant": 0, "queued": 0}
+    async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers=headers) as client:
+        # Zostawiamy limit dla wyszukiwarki, żeby newsy nie wypchnęły blogów i źródeł bezpośrednich.
+        google_limit = min(5, limit)
+        async def load_google_group(group):
             query = " OR ".join(item["term"] for item in group)
-            params = {"q": query, "hl": "pl", "gl": "PL", "ceid": "PL:pl"}
-            response = await client.get("https://news.google.com/rss/search", params=params)
-            response.raise_for_status()
-            root = ET.fromstring(response.content)
-            items = root.findall(".//item")
-            feed_items += len(items)
-            for item in items:
-                if len(found) >= limit:
-                    break
-                url = (item.findtext("link") or "").strip()
-                title = (item.findtext("title") or "").strip()
-                summary = BeautifulSoup(item.findtext("description") or "", "html.parser").get_text(" ", strip=True)
-                searchable = (title + " " + summary).lower()
+            try:
+                response = await client.get("https://news.google.com/rss/search", params={"q": query, "hl": "pl", "gl": "PL", "ceid": "PL:pl"})
+                response.raise_for_status()
+                return parse_feed(response.content, str(response.url)), None
+            except (httpx.HTTPError, ET.ParseError) as exc:
+                return [], str(exc)[:220]
+
+        google_results = await asyncio.gather(*(load_google_group(group) for group in groups))
+        for entries, error in google_results:
+            if error:
+                errors.append({"source": google_name, "error": error})
+                continue
+            sources[google_name]["items"] += len(entries)
+            for entry in entries:
+                searchable = (entry["title"] + " " + entry["description"]).lower()
                 if not any(signal in searchable for signal in finance_context):
                     continue
-                relevant_items += 1
-                if not url.startswith("https://") or url in seen:
+                sources[google_name]["relevant"] += 1
+                if len(found) >= google_limit:
+                    break
+                await enqueue(entry["url"], entry["title"], google_name)
+
+        # Bezpośrednie kanały wydawców/blogów. Są tematycznie dobrane, więc nie
+        # odrzucamy tekstu tylko dlatego, że RSS zawiera krótki opis zamiast artykułu.
+        async def load_public_feed(feed):
+            try:
+                response = await client.get(feed["url"])
+                response.raise_for_status()
+                return parse_feed(response.content, str(response.url)), None
+            except (httpx.HTTPError, ET.ParseError, ValueError) as exc:
+                return [], str(exc)[:220]
+
+        public_feed_results = await asyncio.gather(*(load_public_feed(feed) for feed in PUBLIC_RSS_FEEDS))
+        for feed, (entries, error) in zip(PUBLIC_RSS_FEEDS, public_feed_results):
+            source_name = feed["name"]
+            counter = sources.setdefault(source_name, {"items": 0, "relevant": 0, "queued": 0})
+            if error:
+                errors.append({"source": source_name, "error": error})
+                logger.info("RSS source %s unavailable: %s", source_name, error)
+                continue
+            counter["items"] = len(entries)
+            # Kilka najnowszych pozycji na źródło wystarczy; stare wpisy i tak
+            # zostają pominięte przez deduplikację URL-i.
+            queued_from_feed = 0
+            for entry in entries[:5]:
+                if len(found) >= limit:
+                    break
+                searchable = (entry["title"] + " " + entry["description"]).lower()
+                if not any(signal in searchable for signal in finance_context):
                     continue
-                seen.add(url)
-                if db.scalar(select(Finding.id).where(Finding.url == url)):
-                    continue
-                if db.scalar(select(ScanJob.id).where(ScanJob.url == url, ScanJob.status.in_(["queued", "processing", "completed"]))):
-                    continue
-                job = ScanJob(url=url, author="Google News RSS: " + title[:200])
-                db.add(job)
-                db.flush()
-                await jobs.put(job.id)
-                found.append({"url": url, "title": title, "job_id": job.id})
+                counter["relevant"] += 1
+                if await enqueue(entry["url"], entry["title"], source_name):
+                    queued_from_feed += 1
+                    if queued_from_feed >= 1:
+                        break
+
+        # Sitemap uzupełnia RSS o publiczne adresy. Czytamy tylko ograniczoną
+        # liczbę map i adresów, żeby nie zalewać kolejki starszymi artykułami.
+        async def load_sitemap(sitemap):
+            try:
+                response = await client.get(sitemap["url"])
+                response.raise_for_status()
+                pages, nested = parse_sitemap(response.content, str(response.url))
+                for nested_url in nested[:2]:
+                    nested_response = await client.get(nested_url)
+                    nested_response.raise_for_status()
+                    nested_pages, _ = parse_sitemap(nested_response.content, str(nested_response.url))
+                    pages.extend(nested_pages)
+                return pages, None
+            except (httpx.HTTPError, ET.ParseError, ValueError) as exc:
+                return [], str(exc)[:220]
+
+        sitemap_results = await asyncio.gather(*(load_sitemap(sitemap) for sitemap in PUBLIC_SITEMAPS))
+        for sitemap, (pages, error) in zip(PUBLIC_SITEMAPS, sitemap_results):
+            source_name = sitemap["name"]
+            counter = sources.setdefault(source_name, {"items": 0, "relevant": 0, "queued": 0})
+            if error:
+                errors.append({"source": source_name, "error": error})
+                logger.info("Sitemap source %s unavailable: %s", source_name, error)
+                continue
+            counter["items"] = len(pages)
+            for page_url in pages[-5:]:
+                if len(found) >= limit:
+                    break
+                counter["relevant"] += 1
+                if await enqueue(page_url, "Publiczny adres znaleziony w sitemap", source_name):
+                    break
+
     db.commit()
-    return {"items": found, "feed_items": feed_items, "relevant_items": relevant_items, "query_count": len(groups)}
+    return {
+        "items": found,
+        "feed_items": sum(s["items"] for name, s in sources.items() if name == google_name),
+        "relevant_items": sources[google_name]["relevant"],
+        "query_count": len(groups),
+        "sources": sources,
+        "errors": errors,
+    }
 
 async def periodic_scheduler():
     await asyncio.sleep(20)
@@ -415,8 +523,10 @@ async def periodic_scheduler():
                 discovery_status["last_found"] = len(result["items"])
                 discovery_status["feed_items"] = result["feed_items"]
                 discovery_status["relevant_items"] = result["relevant_items"]
+                discovery_status["source_results"] = result["sources"]
+                discovery_status["source_errors"] = result["errors"]
                 if result["feed_items"]:
-                    logger.info("RSS returned %s entries; queued %s new pages", result["feed_items"], len(result["items"]))
+                    logger.info("Google News returned %s entries; all public sources queued %s new pages", result["feed_items"], len(result["items"]))
         except Exception as exc:
             discovery_status["last_error"] = str(exc)[:300]
             logger.warning("Public RSS discovery failed: %s", exc)
@@ -467,7 +577,11 @@ async def health():
 
 @app.get("/watchlist")
 def watchlist():
-    return {"terms": SEARCH_TERMS, "count": len(SEARCH_TERMS), "source": "Google News RSS"}
+    return {
+        "terms": SEARCH_TERMS,
+        "count": len(SEARCH_TERMS),
+        "sources": ["Google News RSS", *[feed["name"] for feed in PUBLIC_RSS_FEEDS], *[item["name"] for item in PUBLIC_SITEMAPS]],
+    }
 
 @app.get("/crawler/status")
 def crawler_status(db: Session = Depends(get_db)):
@@ -495,8 +609,17 @@ async def discover_now(db: Session = Depends(get_db)):
     discovery_status.update({"stage": "searching", "last_started_at": datetime.now(timezone.utc).isoformat(), "last_error": None})
     try:
         result = await discover_public_pages(db)
-        discovery_status.update({"last_found": len(result["items"]), "feed_items": result["feed_items"], "relevant_items": result["relevant_items"], "last_finished_at": datetime.now(timezone.utc).isoformat()})
-        return {"source": "Google News RSS", "queued": len(result["items"]), "feed_items": result["feed_items"], "relevant_items": result["relevant_items"], "query_count": result["query_count"], "items": result["items"]}
+        discovery_status.update({
+            "last_found": len(result["items"]), "feed_items": result["feed_items"],
+            "relevant_items": result["relevant_items"], "source_results": result["sources"],
+            "source_errors": result["errors"], "last_finished_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {
+            "source": "Google News, public RSS and sitemaps", "queued": len(result["items"]),
+            "feed_items": result["feed_items"], "relevant_items": result["relevant_items"],
+            "query_count": result["query_count"], "sources": result["sources"],
+            "errors": result["errors"], "items": result["items"],
+        }
     except httpx.HTTPError as exc:
         discovery_status["last_error"] = str(exc)[:300]
         raise HTTPException(502, f"Public search source unavailable: {exc}")

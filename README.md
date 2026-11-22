@@ -3,7 +3,7 @@
 
 Kompleksowy system monitoringu treści w sieci służący do automatycznej identyfikacji, agregacji oraz wielopoziomowej analizy materiałów promocyjnych i ofert instrumentów oraz usług finansowych na polskim rynku. System działa w 100% w środowisku on-premise, bez zależności od zewnętrznych, płatnych API.
 
-Publiczne strony są wyszukiwane przez Google News RSS na podstawie 20 haseł w `scraper-backend/app/watchlist.py`. Wyszukiwanie uruchamia się co minutę i ręcznie z dashboardu („Szukaj publicznych stron teraz”); nowe adresy trafiają do kolejki skanowania. Ustaw `DISCOVERY_INTERVAL_SECONDS` w `.env`, aby zmienić częstotliwość. Obejmuje to publiczne wyniki RSS, nie cały Internet ani posty z Instagrama/TikToka.
+Publiczne strony są wyszukiwane przez Google News RSS na podstawie 20 haseł w `scraper-backend/app/watchlist.py`. Dodatkowo skaner czyta publiczne kanały RSS Strefy Inwestorów, Bankier.pl, GPW i bloga Humanista na giełdzie oraz uzupełnia je sitemapą Strefy Inwestorów. Nowe adresy z tych źródeł trafiają do tej samej kolejki pobierania i analizy. Wyszukiwanie uruchamia się co minutę i ręcznie z dashboardu („Przeszukaj źródła”); ustaw `DISCOVERY_INTERVAL_SECONDS` w `.env`, aby zmienić częstotliwość. To bezpłatne, publiczne źródła, ale nie cały Internet ani prywatne posty z Instagrama/TikToka; poszczególne strony mogą ograniczać automatyczne pobieranie.
 
 ---
 

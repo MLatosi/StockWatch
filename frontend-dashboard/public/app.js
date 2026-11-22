@@ -230,8 +230,9 @@ async function updateCrawlerStatus() {
     $('#pagesQueued').textContent = status.queued_scans;
     $('#pagesFailed').textContent = status.failed_scans;
     const failures = status.recent_failures || [];
-    $('#crawlerFailures').innerHTML = failures.length
-      ? '<b>Ostatnie błędy skanowania</b>' + failures.map(f => `<div class="crawler-failure"><a href="${esc(f.url)}" target="_blank" rel="noreferrer">${esc(f.url)}</a><span>${esc(f.error || 'Brak opisu błędu')}</span></div>`).join('')
+    const sourceFailures = status.discovery?.source_errors || [];
+    $('#crawlerFailures').innerHTML = failures.length || sourceFailures.length
+      ? '<b>Ostatnie błędy skanowania i źródeł</b>' + sourceFailures.map(f => `<div class="crawler-failure"><span><b>${esc(f.source)}</b></span><span>${esc(f.error || 'Brak opisu błędu')}</span></div>`).join('') + failures.map(f => `<div class="crawler-failure"><a href="${esc(f.url)}" target="_blank" rel="noreferrer">${esc(f.url)}</a><span>${esc(f.error || 'Brak opisu błędu')}</span></div>`).join('')
       : '<span class="no-failures">Brak ostatnich błędów. Skaner działa poprawnie.</span>';
     if (status.is_working) {
       const stage = status.current.stage === 'fetching_page' ? 'Pobieram stronę' : 'Analizuję treść';
@@ -240,9 +241,9 @@ async function updateCrawlerStatus() {
       const elapsed = status.current.started_at ? Math.max(0, Math.floor(Date.now() / 1000 - new Date(status.current.started_at).getTime() / 1000)) : 0;
       $('#currentPage').innerHTML = 'Teraz (' + elapsed + ' s): <a target="_blank" rel="noreferrer" href="' + esc(status.current.url) + '">' + esc(status.current.url) + '</a>';
     } else if (status.discovery.stage === 'searching') {
-      $('#crawlerState').textContent = '● Szukam nowych publicznych stron…';
+      $('#crawlerState').textContent = '● Sprawdzam publiczne źródła…';
       $('#crawlerState').style.color = 'var(--accent)';
-      $('#currentPage').textContent = 'Przeszukuję Google News RSS po ' + (status.watchlist_count || 20) + ' hasłach.';
+      $('#currentPage').textContent = 'Przeszukuję Google News, blogi, kanały RSS i mapy stron.';
     } else {
       const secondsLeft = Math.max(0, Math.ceil(status.discovery.next_run_at - Date.now() / 1000));
       const minutes = Math.floor(secondsLeft / 60);
@@ -253,7 +254,13 @@ async function updateCrawlerStatus() {
         $('#currentPage').textContent = 'Ostatnie wyszukiwanie nie powiodło się: ' + status.discovery.last_error;
       } else {
         const lastRun = status.discovery.last_finished_at ? new Date(status.discovery.last_finished_at).toLocaleTimeString('pl-PL') : 'jeszcze się nie odbyło';
-        $('#currentPage').textContent = 'Ostatnie wyszukiwanie: ' + lastRun + ' · wpisy RSS: ' + (status.discovery.feed_items ?? '—') + ' · pasujące finansowo: ' + (status.discovery.relevant_items ?? '—') + ' · nowe adresy w kolejce: ' + status.discovery.last_found + '. Wyszukiwanie uruchamia się automatycznie.';
+        const sourceStats = Object.entries(status.discovery.source_results || {});
+        const rssStats = sourceStats.filter(([name]) => name !== 'Google News RSS' && !name.includes('mapa strony'));
+        const sitemapStats = sourceStats.filter(([name]) => name.includes('mapa strony'));
+        const rssItems = rssStats.reduce((sum, [, value]) => sum + (value.items || 0), 0);
+        const rssQueued = rssStats.reduce((sum, [, value]) => sum + (value.queued || 0), 0);
+        const sitemapItems = sitemapStats.reduce((sum, [, value]) => sum + (value.items || 0), 0);
+        $('#currentPage').textContent = `Ostatni przebieg ${lastRun}: Google News ${status.discovery.feed_items ?? 0} wpisów, blogi i RSS ${rssItems} (${rssQueued} nowych), mapy stron ${sitemapItems}; razem ${status.discovery.last_found || 0} nowych adresów w kolejce.`;
       }
     }
   } catch (err) {
@@ -298,10 +305,15 @@ $('#discoverBtn').addEventListener('click', async () => {
   const button = $('#discoverBtn');
   const status = $('#scanStatusBox');
   button.disabled = true;
-  status.textContent = 'Szukam publicznych stron pasujących do monitorowanych haseł…';
+  status.textContent = 'Sprawdzam Google News, publiczne blogi, kanały RSS i mapy stron…';
   try {
     const result = await getJson('/api/discover', { method: 'POST' });
-    status.textContent = `Google News RSS zwrócił ${result.feed_items} wpisów; ${result.relevant_items} pasuje do tematyki finansowej, ${result.queued} nowych adresów dodano do kolejki.`;
+    const rssSources = Object.entries(result.sources || {}).filter(([name]) => name !== 'Google News RSS' && !name.includes('mapa strony'));
+    const rssItems = rssSources.reduce((sum, [, value]) => sum + (value.items || 0), 0);
+    const rssQueued = rssSources.reduce((sum, [, value]) => sum + (value.queued || 0), 0);
+    const sitemapItems = Object.entries(result.sources || {}).filter(([name]) => name.includes('mapa strony')).reduce((sum, [, value]) => sum + (value.items || 0), 0);
+    const sourceErrors = result.errors || [];
+    status.textContent = `Google News: ${result.feed_items} wpisów, z tego ${result.relevant_items} tematycznych. Bezpośrednie RSS: ${rssItems} wpisów (${rssQueued} nowych), mapy stron: ${sitemapItems} adresów. Łącznie dodano do kolejki ${result.queued}.` + (sourceErrors.length ? ` Źródeł z błędem: ${sourceErrors.length} (${sourceErrors.map(e => e.source).join(', ')}).` : '');
     updateCrawlerStatus();
     if (result.queued) setTimeout(() => { loadData(); updateCrawlerStatus(); }, 1500);
   } catch (err) {
